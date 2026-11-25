@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Warship Gunner 2 Compendium</title>
+<style>
+  :root{--bg:#0b1220;--panel:#141f33;--line:#3b4d6b;--text:#e8eef9;--muted:#9fb0c8;--accent:#4cc2ff;--warn:#f0a030}
+  @media (prefers-color-scheme:light){:root{--bg:#f6f8fc;--panel:#fff;--line:#b8c4d6;--text:#16202e;--muted:#566377;--accent:#0b72c9;--warn:#b86a00}}
+  body{margin:0;padding:16px 20px 56px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.45}
+  h1{font-size:20px;margin:0 0 4px} p.lead{margin:4px 0 14px;color:var(--muted);font-size:14px;max-width:820px}
+  .wrap{display:flex;gap:16px;align-items:flex-start;max-width:1280px}
+  #list{flex:0 0 220px;position:sticky;top:calc(var(--sn-h,0px) + 12px);max-height:calc(100vh - var(--sn-h,0px) - 28px);overflow:auto;display:flex;flex-direction:column;gap:4px}
+  #list button{display:block;width:100%;text-align:left;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text);font:inherit;font-size:14px;cursor:pointer}
+  #list button:hover,#list button:focus-visible{border-color:var(--accent);outline:none}
+  #list button[aria-current=true]{border-color:var(--accent);background:rgba(76,194,255,.16)}
+  #list small{display:block;color:var(--muted);font-size:12px}
+  #detail{flex:1 1 auto;min-width:0}
+  section.boss{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  section.boss h2{margin:0 0 2px;font-size:18px;color:var(--accent)}
+  .meta{font-size:13px;color:var(--muted);margin:0 0 10px} .meta a{color:var(--accent)}
+  .top{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+  .stage{flex:0 0 auto;width:420px;max-width:100%} .stage canvas{width:100%;aspect-ratio:420/260;display:block;border-radius:8px;background:rgba(127,127,127,.12);border:1px solid var(--line)}
+  .stage .cap{font-size:12px;color:var(--muted);margin-top:3px} .stage .cap a{color:var(--accent)}
+  .tabs{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 6px}
+  .tabs .tb{padding:4px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--text);font:inherit;font-size:13px;cursor:pointer}
+  .tabs .tb:hover,.tabs .tb:focus-visible{border-color:var(--accent);outline:none} .tabs .tb[aria-pressed=true]{border-color:var(--accent);background:rgba(76,194,255,.2)}
+  .blank{width:100%;aspect-ratio:420/260;border-radius:8px;border:1px solid var(--line);box-sizing:border-box;background:rgba(127,127,127,.12)}
+  #list button.sub{width:calc(100% - 16px);margin-left:16px;font-size:13px}
+  .facts{flex:1 1 300px;min-width:260px}
+  h3{font-size:12px;margin:12px 0 4px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em} .facts h3:first-child{margin-top:0}
+  ul{margin:0;padding-left:18px;font-size:14px} li{margin:2px 0} .unk{color:var(--muted);font-size:13px;font-style:italic} .src{color:var(--muted);font-size:12px}
+  .ingame{font-size:14px;font-weight:600;margin:0 0 6px} .facts a,table.comp a{color:var(--accent)}
+  table.comp{border-collapse:collapse;margin-top:12px;width:100%;font-size:13px} table.comp td,table.comp th{padding:5px 8px;border-top:1px solid var(--line);text-align:left;vertical-align:middle}
+  table.comp th{color:var(--muted);font-weight:600;font-size:12px;border-top:0} table.comp canvas{width:108px;aspect-ratio:108/72;display:block;border-radius:5px;background:rgba(127,127,127,.12)}
+  table.comp td.hp{white-space:nowrap} .dim{color:var(--muted)} details summary{cursor:pointer;color:var(--muted);font-size:13px;margin-top:8px}
+  .mark{display:inline-block;padding:0 6px;border-radius:4px;font-size:11px;border:1px solid var(--warn);color:var(--warn);margin-left:6px}
+  @media (max-width:800px){.wrap{flex-direction:column}#list{position:static;max-height:none;flex:none;width:100%;flex-direction:row;flex-wrap:wrap}#list button{width:auto}}
+</style><script src="shell.js" defer></script></head><body><script src="nav.js"></script>
+<h1>Bosses</h1>
+<p class="lead">The superweapons (enemy bosses): pick one on the left. Health is the Endurance the game's own viewer shows; the weapon list is the viewer's too. Models that move have an <a href="boss_anim.html" style="color:var(--accent)">Animations</a> link under the viewer.</p>
+<div class="wrap"><nav id="list" aria-label="Bosses"></nav><div id="detail"></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="bossview.js"></script>
+<script>
+(async function () {
+  const J = u => fetch(u, { cache: 'no-cache' }).then(r => r.json()).catch(() => null);
+  const [info, notes, beh, anim] = await Promise.all([J('boss_info.json'), J('boss_notes.json'), J('boss_behavior.json'), J('models/boss_anim.json')]);
+  const animIds = new Set((anim || []).map(x => x.id));          // models that have animation clips (boss_anim.html#<model id>)
+  const listEl = document.getElementById('list'), detail = document.getElementById('detail');
+  if (!info) { detail.textContent = 'Could not load boss_info.json (serve this folder over http).'; return; }
+  const norm = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const slug = s => 'b-' + norm(s);
+  const E = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+  const hpText = ents => {
+    if (!ents || !ents.length) return ['No entity row', true];
+    const hs = [...new Set(ents.map(e => e.hp))];
+    if (hs.length === 1 && hs[0] > 0) return [hs[0].toLocaleString('en-US') + ' hit points', false];
+    if (hs.every(h => h === 0)) return ['Set by the game code (table value 0)', true];
+    return [hs.map(h => h || 0).join(' / ') + ' hit points', false];
+  };
+  const std = (notes && notes.standard_weapons) || null;
+  const weaponList = ws => { const ul = E('ul'); ws.forEach(w => { const li = E('li'); if (w.chip) { const a = E('a', '', w.name); a.href = 'tree.html#' + encodeURIComponent(w.chip).replace(/%3A/g, ':'); a.title = 'Open this weapon on the tech tree'; li.appendChild(a); } else { li.textContent = w.name; li.title = 'Not a tech-tree weapon'; } ul.appendChild(li); }); return ul; };
+
+  // one boss -> its detail panel. Only the panel on screen has 3D viewers (the previous one is removed, which frees its models), so nothing else is drawn.
+  function build(b, mv) {           // b = the superweapon (models, parts), mv = one in-game entry of it (name, stats, weapons); entries of one superweapon share the model
+    const n = (notes && notes.bosses && notes.bosses[b.title]) || {};
+    const mine = beh ? Object.values(beh).filter(v => v && v.boss === b.title) : [];
+    const sec = E('section', 'boss'); sec.id = slug(mv ? mv.name : b.title);
+    sec.appendChild(E('h2', '', mv ? mv.name : b.title));
+    const blank = !!(mv && mv.invisible);          // a stealth ship: its viewer stays an empty box
+    const meta = E('p', 'meta'), missions = mv ? mv.missions : b.missions;
+    if (mv && !blank && norm(mv.name) !== norm(b.title)) meta.append('Same model as ' + b.title + '. ');
+    if (missions.length) { meta.append('Missions: '); missions.forEach((c, i) => { if (i) meta.append(', '); const a = E('a', '', c); a.href = 'campaign.html#' + c; meta.appendChild(a); }); }
+    else meta.append('Not listed in any mission\'s superweapons.');
+    sec.appendChild(meta);
+    const top = E('div', 'top'), stage = E('div', 'stage');
+    const vs = b.variants || [];
+    // what the one big viewer can show: the assembled boss (if there is one) or any single model of it. Only one model is ever running at a time.
+    const views = []; const byModel = new Map();
+    if (b.composite) views.push({ label: 'Assembled', model: b.composite, assembled: true });
+    const ordered = b.components.filter(c => c.role !== 'other').concat(b.components.filter(c => c.role === 'other'));          // named parts first, then the unnamed models (labelled with their file names)
+    ordered.forEach(c => { const v = byModel.get(c.model); if (v) v.label += ' & ' + c.label; else { const nv = { label: c.label, model: c.model }; byModel.set(c.model, nv); views.push(nv); } });
+    { const seen = {}; views.forEach(v => { seen[v.label] = (seen[v.label] || 0) + 1; }); const idx = {}; views.forEach(v => { if (seen[v.label] > 1) { idx[v.label] = (idx[v.label] || 0) + 1; v.label += ' ' + idx[v.label]; } }); }       // two different models with the same name: number them
+    let setView = () => {};
+    if (blank) stage.appendChild(E('div', 'blank'));
+    else if (views.length) {
+      const bar = E('div', 'tabs'), slot = E('div', 'slot'), cap = E('div', 'cap'), btns = new Map();
+      setView = v => {
+        btns.forEach((btn, key) => btn.setAttribute('aria-pressed', key === v));
+        const nc = E('canvas'); nc.width = 420; nc.height = 260; slot.replaceChildren(nc);          // the old canvas leaves the page, which frees its model
+        bossView(v.model, 420 / 260, nc);
+        cap.replaceChildren(v.assembled ? 'Assembled model. ' : '', Object.assign(E('a', '', 'Open in the model viewer'), { href: 'models.html#' + v.model }),
+          ...(animIds.has(v.model) ? [' · ', Object.assign(E('a', '', 'Animations'), { href: 'boss_anim.html#' + v.model, title: 'Play this model\'s animation clips' })] : []));
+      };
+      if (views.length > 1) {
+        views.forEach(v => { const btn = E('button', 'tb', v.label); btn.type = 'button'; btn.onclick = () => setView(v); btns.set(v, btn); bar.appendChild(btn); });
+        stage.appendChild(bar);
+      }
+      stage.append(slot, cap); setView(views[0]);
+    }
+    top.appendChild(stage);
+    const facts = E('div', 'facts');
+    if (mv) { const t = E('div', 'ingame', mv.title); t.title = 'As the game\'s own viewer prints it'; facts.appendChild(t); }
+    facts.appendChild(E('h3', '', 'Health'));
+    const hl = E('ul'); const body = b.components.find(c => c.role === 'main');
+    if (mv) { hl.appendChild(E('li', '', 'Endurance ' + mv.endurance.toLocaleString('en-US'))); hl.appendChild(E('li', 'dim', 'Speed ' + mv.speed)); }
+    else if (body) { const [t, unk] = hpText(body.entities); hl.appendChild(E('li', unk ? 'unk' : '', body.label + ': ' + t)); }
+    b.components.filter(c => c.role !== 'main' && c.entities.length && c.entities.some(e => e.hp > 0)).forEach(c => hl.appendChild(E('li', '', c.label + ': ' + hpText(c.entities)[0])));
+    Object.values(b.code_facts || {}).forEach(f => { const li = E('li', '', f.name + ': ' + f.hp.toLocaleString('en-US') + ' (found in the code)'); li.appendChild(E('div', 'src', f.source)); hl.appendChild(li); });
+    facts.appendChild(hl);
+    facts.appendChild(E('h3', '', 'Weapons'));
+    let hasW = false;
+    if (mv) { facts.appendChild(weaponList(mv.weapons)); hasW = true; }
+    if ((n.weapons || []).length) { const wl = E('ul'); n.weapons.forEach(w => wl.appendChild(E('li', '', w.name + (w.detail ? ': ' + w.detail : '')))); facts.appendChild(wl); hasW = true; }
+    if (std && std.length) { facts.appendChild(E('div', 'dim', 'Standard weapons shared by most bosses: ' + std.map(w => w.name).join(', '))); hasW = true; }
+    if (!hasW) facts.appendChild(E('div', 'unk', 'Not decoded yet.'));
+    const lines = (n.behavior || []).concat(...mine.map(m => m.lines || []));
+    if (lines.length) { facts.appendChild(E('h3', '', 'Behavior')); const bl = E('ul'); lines.forEach(t => bl.appendChild(E('li', '', t))); facts.appendChild(bl); }
+    top.appendChild(facts); sec.appendChild(top);
+    const comps = ordered;          // every model of the boss, the unnamed ones included
+    const onlyBody = comps.length === 1 && comps[0].role === 'main' && !(b.extra_entities && b.extra_entities.length);      // a single-model boss: the table would just repeat the model and health shown above
+    if (!blank && !onlyBody && comps.length) {
+      const tbl = E('table', 'comp'); const hr = E('tr'); ['Component', 'Entity class', 'Health'].forEach(h => hr.appendChild(E('th', '', h))); tbl.appendChild(hr);
+      const pick = c => { const v = byModel.get(c.model); if (v) { setView(v); stage.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } };       // a row shows that model in the big viewer
+      const nameCell = c => { const td = E('td'), a = E('a', '', c.label); a.href = 'models.html#' + c.model; a.title = 'Show in the viewer above'; a.onclick = ev => { ev.preventDefault(); pick(c); }; td.appendChild(a); if (c.role === 'main') td.appendChild(E('span', 'mark', 'main body')); return td; };
+      comps.forEach(c => { const [t, unk] = c.role === 'other' ? ['-', true] : hpText(c.entities); const tr = E('tr'); tr.append(nameCell(c), E('td', 'dim', c.entities.length ? c.entities.map(e => e.row).join(', ') : (c.role === 'other' ? 'unnamed model' : '-')), E('td', 'hp' + (unk ? ' dim' : ''), t)); tbl.appendChild(tr); });
+      (b.extra_entities || []).forEach(e => { const tr = E('tr'); tr.append(E('td', '', e.name === '(unnamed)' ? 'Ice pieces (unnamed entity)' : e.name), E('td', 'dim', String(e.row)), E('td', 'hp', e.hp ? e.hp.toLocaleString('en-US') + ' hit points' : 'Set by the game code')); tbl.appendChild(tr); });
+      sec.appendChild(tbl);
+    }
+    return sec;
+  }
+
+  // left list + hash state (#b-habakkuk): picking a boss is a history entry, so Back returns to the previous one
+  // one list item per in-game entry: the superweapon's own entry first, then its other names (Nautilus, Amaterasu, Perfect Platter ...) indented under it
+  const entries = new Map(), buttons = new Map(); let first = null;
+  for (const b of info.bosses) {
+    const vs = (b.variants || []).slice().sort((x, y) => (norm(y.name) === norm(b.title)) - (norm(x.name) === norm(b.title)));
+    const list = vs.length ? vs : [null];
+    list.forEach((v, i) => {
+      const id = slug(v ? v.name : b.title); entries.set(id, { b, v }); if (!first) first = id;
+      const btn = E('button', i ? 'sub' : ''); btn.type = 'button'; btn.textContent = v ? v.name : b.title; btn.onclick = () => show(id, true);
+      listEl.appendChild(btn); buttons.set(id, btn);
+    });
+  }
+  let cur = null;
+  function show(id, push) {
+    if (!entries.has(id)) id = first;
+    if (push && location.hash.slice(1) !== id) { try { history.pushState(null, '', '#' + id); } catch (e) {} }
+    if (cur === id) return; cur = id;
+    buttons.forEach((btn, k) => btn.setAttribute('aria-current', k === id));
+    const { b, v } = entries.get(id); detail.replaceChildren(build(b, v));
+  }
+  const fromHash = () => show(location.hash.slice(1), false);
+  addEventListener('hashchange', fromHash); addEventListener('popstate', fromHash);
+  fromHash();
+})();
+</script>
+</body></html>

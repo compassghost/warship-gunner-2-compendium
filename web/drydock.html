@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Floating dock</title>
+<style>
+:root{--bg:#0a101c;--panel:#111a2b;--line:#2a3a55;--text:#dbe6f5;--muted:#8aa0bd;--accent:#5cc8ff}
+@media (prefers-color-scheme:light){:root{--bg:#f3f6fa;--panel:#fff;--line:#c9d3e0;--text:#16202e;--muted:#5a6b82;--accent:#0a6fb5}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+main{max-width:1200px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:4px 0 6px}
+p.note{color:var(--muted);margin:0 0 12px;max-width:95ch}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px}
+select,button{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 9px}
+button{cursor:pointer} button:hover{border-color:var(--accent)} button[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}
+label{color:var(--muted)}
+#stage{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+#cv{display:block;width:100%;height:min(72vh,680px);touch-action:none;cursor:grab}
+#hud{position:absolute;left:10px;top:8px;color:#fff;font-size:12px;text-shadow:0 1px 2px #000;pointer-events:none}
+</style>
+</head>
+<body>
+<script src="nav.js"></script>
+<main>
+  <h1>Floating dock (Skidbladnir)</h1>
+  <p class="note">Skidbladnir, the player's floating dock.</p>
+  <div class="bar">
+    <label>Dock <select id="dock"></select></label>
+    <button id="water" aria-pressed="true">Water</button>
+    <label title="Time of day, 24-hour clock: type HH:MM (or just the hour, e.g. 20, or 2030) and press Enter. Everything derived from the clock is the game's data, see notes/weather.md">Time <input id="clkt" type="text" value="12:00" size="5" maxlength="5" placeholder="HH:MM" inputmode="numeric" style="width:5em;text-align:center"><input id="clk" type="hidden" value="720"> <span id="clkv" style="font-size:12px"></span></label>
+    <label title="The game's 13 weather values (DAT 2). The names are MY reading of their parameters (palette set, rain / particle counts, mist density, lightning code); which weather the dock screen uses is NOT decoded">Weather <select id="wth"><option value="0">clear</option><option value="1">clear (variant)</option><option value="2">light cloud</option><option value="3">overcast</option><option value="4">overcast + lightning</option><option value="5">light rain</option><option value="6">rain</option><option value="7">heavy rain + lightning</option><option value="8">light mist</option><option value="9">mist</option><option value="10">thick mist</option><option value="11">snow?</option><option value="12">heavy snow?</option></select></label>
+    <label title="Each mission's start time (mission script record kind 3, decoded) and the briefing's START label for it (decoded). Weather (decoded 2026-11-17): the stage weights are weather 0 for every mission, but six missions load an event script whose weather command sets another weather: MED_I_411 (later step: 12), EUR_J_483 (12), EUR_N_510 (later step: 7), FAR_C_660 Hell Atsche (8, mist), FAR_A_680 (11), ARC_Z_690 (11, later 4). The page applies the first weather such a script sets on load; whether the game shows it from the first frame or only when that event runs is not settled (see notes/weather.md)">Mission <select id="mis"><option value="">-</option></select></label>
+    <label title="Decoded: the game's sky is a 2D gradient with colour stops at 60/40/25/10/0/-2/-4/-90 degrees elevation (phase colour slots 0-7), and its GS fog is linear from the camera to 'far' (weather float 3) in the horizon colour (slot 4)"><input type="checkbox" id="gsky" checked> game sky and fog</label>
+    <label title="Decoded value, approximate use: the game's ambient light is (colour 0 + flash colour) x float 4 / 128; the page scales the dock and props by its brightness relative to clear noon (the renderer's real lighting maths is not reproduced)"><input type="checkbox" id="gdim" checked> game light level</label>
+    <label title="Decoded per weather (DAT 2 records): effect type (rain 5-7, mist 8-10, slow particles = snow? 11-12), particle count (300 / 1000 / 3000 drops, 800 / 3000 flakes), particle colour and alpha (day and night records), fall speed ratio rain 1.0 : snow 0.2, lightning in weathers 4 and 7, fog 100 to 2 x 1980 during a flash. MY choices (not decoded): the size of the box the particles fill around the camera, the absolute fall speed, the streak length, the flake size and the time between flashes"><input type="checkbox" id="gfx" checked> weather effects</label>
+    <label>Palette <select id="pal"></select></label>
+    <input id="osz" type="hidden" value="10">
+    <label>Brightness <input id="bri" type="range" min="0.6" max="3" step="0.05" value="1" style="vertical-align:middle;width:120px"></label>
+    <button id="objs" aria-pressed="true" title="Props placed from the dock map's own placement table">Objects</button>
+    <button id="lights" aria-pressed="false" title="Lamp glows and light beams (they are off during the day)">Lights</button>
+    <label>Turn <select id="turn"><option value="0">0&deg;</option><option value="90">90&deg;</option><option value="180">180&deg;</option><option value="270">270&deg;</option></select></label>
+    <button id="wire" aria-pressed="false">Wireframe</button>
+    <button id="shot">Save picture</button>
+  </div>
+  <div id="stage"><canvas id="cv"></canvas><div id="hud"></div></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="water.js?v=fog1"></script>
+<script>
+(async function () {
+  var $ = function (id) { return document.getElementById(id); }, cv = $('cv');
+  var renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, preserveDrawingBuffer: true });
+  var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(40, 1, 100, 1.2e7), root = new THREE.Group();
+  var tx = 0, ty = 0, tz = 0;
+  window.dockView = function (a) { if (a.tx !== undefined) tx = a.tx; if (a.ty !== undefined) ty = a.ty; if (a.tz !== undefined) tz = a.tz; if (a.dist) dist = a.dist;
+    if (a.at) { tx = a.at[0] * 4096 + root.position.x; ty = a.at[2] * 4096 + root.position.y; tz = -a.at[1] * 4096 + root.position.z; }
+    if (a.yaw !== undefined) yaw = a.yaw; if (a.pitch !== undefined) pitch = a.pitch; if (a.zoom) dist *= a.zoom; return { yaw: yaw, pitch: pitch, dist: dist }; };      // for scripted views (debugging)
+  window.dockRoot = root; window.dockCam = cam;window.dockRender = function () { renderer.render(scene, cam); };                                                    // for debugging in the console: dockRoot.children[i].visible
+  scene.add(root); scene.add(new THREE.HemisphereLight(0xffffff, 0x667788, 1.5)); var dl = new THREE.DirectionalLight(0xffffff, 1.0); dl.position.set(-1, 2, 1.2); scene.add(dl);
+  var comps = (await (await fetch('models/composites.json', { cache: 'no-cache' })).json()).filter(function (c) { return /^composite_drydock_/.test(c.id); });
+  var set = await WGWater.load('water/'), water = WGWater.create(set, { group: 0, row: 15, size: 1600000, segments: 200, tile: 40000, waveHeight: 0, waveLength: 60000, fogDensity: 0.0000012 });
+  scene.add(water.mesh);
+  var texCache = {}, yaw = 0.7, pitch = 0.5, dist = 400000, cur = null, wire = false, rw = 0, rh = 0, dpr = 0, want = (location.hash || '').slice(1);
+  function tex(id) {
+    if (!texCache[id]) texCache[id] = new Promise(function (res) { new THREE.TextureLoader().load('models/' + id + '.png', function (t) { t.flipY = false; t.wrapS = t.wrapT = THREE.RepeatWrapping; res(t);   /* no colour-space decode: the PS2 multiplies the raw 8-bit texture by the raw face colour and shows the result as is */ }, undefined, function () { res(null); }); });
+    return texCache[id];
+  }
+  function geometry(dv, off, p, cols, coff) {          // cols = bytes of the .col file (3 per face, 128 = neutral) or null; coff = first face of this part in it
+    var qo = off + p.v * 12, uo = qo + p.q * 8, pos = [], uv = [], rgb = [];
+    for (var k = 0; k < p.q; k++) {
+      var q4 = [0, 1, 2, 3].map(function (j) { return dv.getUint16(qo + (k * 4 + j) * 2, true); });
+      var cr = cols ? cols[(coff + k) * 3] / 128 : 1, cg = cols ? cols[(coff + k) * 3 + 1] / 128 : 1, cb = cols ? cols[(coff + k) * 3 + 2] / 128 : 1;
+      (q4[2] === q4[3] ? [[0, 1, 2]] : [[0, 1, 2], [0, 2, 3]]).forEach(function (t) { t.forEach(function (c) {
+        var vi = q4[c]; pos.push(dv.getFloat32(off + vi * 12, true), dv.getFloat32(off + vi * 12 + 4, true), dv.getFloat32(off + vi * 12 + 8, true)); rgb.push(cr, cg, cb);
+        uv.push(dv.getUint16(uo + (k * 8 + c * 2) * 2, true) / 16384, dv.getUint16(uo + (k * 8 + c * 2 + 1) * 2, true) / 16384); }); });
+    }
+    var g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals();
+    if (cols) g.setAttribute('color', new THREE.Float32BufferAttribute(rgb, 3));
+    g.computeBoundingBox(); return g;
+  }
+  // ---- scenery objects: the dock map's placement table (tools/build_dock_objects.py -> models/dock_objects.json): DOCKJ model number, position in map units (x 4096 = model units), variant
+  var placements = null, modelIndex = null, objGroup = null, objCache = {}, lightInfo = {};
+  async function loadObjData() {
+    if (placements) return;
+    try { placements = await (await fetch('models/dock_objects.json', { cache: 'no-cache' })).json(); var ix = await (await fetch('models/index.json')).json(); modelIndex = {}; ix.forEach(function (m) { modelIndex[m.id] = m; }); lightInfo = await (await fetch('models/dock_lights.json', { cache: 'no-cache' })).json(); } catch (e) { placements = placements || {}; modelIndex = modelIndex || {}; }
+  }
+  async function objModel(id) {
+    if (objCache[id]) return objCache[id];
+    return objCache[id] = (async function () {
+      var m = modelIndex[id]; if (!m) return null;
+      var buf = await (await fetch('models/' + id + '.bin')).arrayBuffer(), dv = new DataView(buf), off = 0, geos = [], t = m.tex != null ? await tex(id) : null;
+      // body = slot 0 only; the light faces (face flag bit 0x100 in slot 12, exported by tools/export_dock_lights.py to <id>_L.bin) are drawn additive and off by default
+      m.parts.forEach(function (p) { if (p.kind === 'mesh' && p.slot !== 12) geos.push(geometry(dv, off, p, null, 0)); off += p.v * 12 + p.q * 24; });
+      var out = geos.map(function (g) { return { g: g, glow: false }; });
+      if (lightInfo[id]) { try { var lb = await (await fetch('models/' + id + '_L.bin')).arrayBuffer(); out.push({ g: geometry(new DataView(lb), 0, lightInfo[id], null, 0), glow: true }); } catch (e) {} }
+      return { geos: out, tex: t };
+    })();
+  }
+  // the table's high 16 bits (0-6) are not a facing (the same prop type has all values along one pier, always aligned with it): probably the story step it appears at; no yaw is stored in the table
+  // user's comparison with the game: the large buildings (DOCKJ00-14, the group at the top of the dock) must be turned 90 degrees counter-clockwise seen from above; the pier props were fine
+  // the high 16 bits of the row id are the facing in 45 degree steps (0-7), counter-clockwise from +x seen from above (floodlights at the four pier corners have 1, 3, 5, 7 and aim at the centre; the two gun mounts have 2 and 6 = north and south, as the user saw in game).
+  // The models themselves face -y (270 degrees), hence the extra 90 degrees: rotation = heading - 270.
+  // The large buildings (DOCKJ00-14) fit their platforms better with a further half turn (footprint overlap: DOCKJ07 0.56 at 270 degrees vs 0.28 at 90; DOCKJ02 0.84 vs 0.72; DOCKJ08 1.0 vs 0.94), so their base is 270 instead of 90.
+  // the buildings were reported turned the wrong way at 270 (my footprint fit was misleading): back to the common base of 90 for every prop
+  // props from the dock's BEV script (AA mounts, DOCKJ20) carry a yaw in radians instead; the user wants them rotated 90 degrees counter-clockwise (seen from above, looking down at the water) from the raw yaw: +90; the AA mounts (DOCKJ41) were then reported facing the hull, so they get a further half turn (+270)
+  // the user wants the four mounts on the hull's deck edge to point out over the basin (west) whatever their script yaw (-44 / +94 degrees) says: the mount model's barrels point along -x at rotation 0 (seen in the viewer), so no turn at all, then 45 degrees more counter-clockwise (seen from above) at the user's request
+  function yawOf(o) { var t = (+$('turn').value) * Math.PI / 180; if (o.j === 41 && o.x > 10 && o.z < 1.5) return Math.PI / 4 + (o.yaw + 0.8) + t; return o.yaw !== undefined ? o.yaw + (o.j === 41 ? 3 * Math.PI / 2 : Math.PI / 2) + t : (90 + o.v * 45) * Math.PI / 180 + t; }
+  // DOCKJ07 (the tall building) is a base block at model z -1350..-490 and a tower from z 510 upwards with nothing between: with the row's z the tower hovered 510 units (x scale) above its platform roof, so it is lowered by that gap.
+  var LOWER = { 7: 510 };
+  // No per-model scale exists in DAT 3 (every DOCKJ / DOBJ model has the same entry), so props share the Object size slider, EXCEPT the tower cranes, which the user reports scale differently: in the game the crane's base reaches the right (inner) edge of its pier.
+  // Derived from that: DOCK07's left pier deck ends at x = -4.07, the crane stands at x = -5.345, so its base half-length must be 1.275 map units = 5222 model units; DOCKJ15's base is 107 x 172 units (the long side lies along world x after the quarter turn), so the scale is 5222 / 172 = 30.4 = 3.04 x the common x10.
+  // DOCKJ16 (docks 4-5, same base 107 x 172, pier edge at -4.27 in the earlier docks): 1.075 * 4096 / 172 = 25.6 = 2.56 x. DOCKJ20 (docks 0-3) is not set (its base differs and the user did not mention it).
+  // The user checked the DOCK07 crane and finds x30 (3 x the common x10) about right, so all three crane models use 3.0 in every dock (DOCKJ15 base measured at x30.4; DOCKJ16 / DOCKJ20 in the earlier docks get the same factor).
+  var MULT = { 15: 3, 16: 3, 20: 3 };      // DOCKJ15 / 16 / 20 are the pier cranes (the pair beside the left pier, a bigger model in later docks): the game draws them much bigger than the common prop scale suggests (guess)
+  function applyScale(m) { m.scale.setScalar(+$('osz').value * (MULT[m.userData.o.j] || 1)); seat(m); }
+  function seat(m) { var o = m.userData.o, s = m.scale.x; m.position.set(o.x * 4096, o.y * 4096, o.z * 4096 - (LOWER[o.j] || 0) * s); }
+  async function placeObjects(c, box) {
+    if (objGroup) { root.remove(objGroup); objGroup.children.forEach(function (m) { m.material.dispose(); }); objGroup = null; }
+    await loadObjData();
+    var list = (placements && placements[c.id.slice(-1)]) || []; objGroup = new THREE.Group(); objGroup.visible = $('objs').getAttribute('aria-pressed') !== 'false'; root.add(objGroup);
+    for (var i = 0; i < list.length; i++) {
+      var o = list[i], mo = o.model && await objModel(o.model); if (!mo) continue;
+      mo.geos.forEach(function (e) {
+        var g = e.g, glow = e.glow;
+        var mat = new THREE.MeshStandardMaterial({ color: mo.tex ? 0xffffff : 0x8fb4d8, map: mo.tex, metalness: 0.05, roughness: 0.85, side: THREE.DoubleSide, transparent: !!mo.tex, alphaTest: mo.tex ? 0.4 : 0 });
+        if (glow) { mat.blending = THREE.AdditiveBlending; mat.depthWrite = false; mat.alphaTest = 0; mat.transparent = true; mat.emissive = new THREE.Color(0xffffff); mat.emissiveMap = mo.tex; mat.color.set(0x000000); }
+        var m = new THREE.Mesh(g, mat); m.frustumCulled = false; m.userData.o = o;
+        m.rotation.z = yawOf(o); applyScale(m); if (glow) { m.userData.glow = true; m.visible = $('lights').getAttribute('aria-pressed') === 'true'; } objGroup.add(m);
+      });
+    }
+  }
+  async function show(c) {
+    cur = c; if (root.children.length) { root.children.forEach(function (m) { if (m.isMesh) { m.geometry.dispose(); m.material.dispose(); } }); root.clear(); objGroup = null; }
+    var buf = await (await fetch('models/' + c.id + '.bin', { cache: 'no-cache' })).arrayBuffer(), dv = new DataView(buf), off = 0, box = new THREE.Box3(), coff = 0;
+    var cols = null; if (c.colors) { try { cols = new Uint8Array(await (await fetch('models/' + c.colors, { cache: 'no-cache' })).arrayBuffer()); } catch (e) { cols = null; } }
+    for (var i = 0; i < c.parts.length; i++) {
+      var p = c.parts[i], g = geometry(dv, off, p, cols, coff); off += p.v * 12 + p.q * 24; coff += p.q; var t = await tex(p.texid);
+      // the dock's lighting is baked into its face colours, so with them the faces are drawn unlit (texture x colour); without them they are lit like any model
+      var mat = cols ? new THREE.MeshBasicMaterial({ color: 0xffffff, map: t, vertexColors: true, side: THREE.DoubleSide, transparent: !!t, alphaTest: t ? 0.4 : 0, wireframe: wire })
+                     : new THREE.MeshStandardMaterial({ color: t ? 0xffffff : 0x8fb4d8, map: t, metalness: 0.05, roughness: 0.85, side: THREE.DoubleSide, transparent: !!t, alphaTest: t ? 0.4 : 0, wireframe: wire });
+      if (cols) mat.color.setScalar(+$('bri').value);                         // faces drawn unlit: a brightness factor stands in for the ambient light the game would add (not known)
+      var m = new THREE.Mesh(g, mat);
+      m.frustumCulled = false; root.add(m); box.union(g.boundingBox);
+    }
+    await placeObjects(c, box);
+    root.rotation.x = -Math.PI / 2;                                            // model data is z-up
+    var ctr = new THREE.Vector3(); box.getCenter(ctr); root.position.set(-ctr.x, -ctr.z + (c.waterZ || 0) * 0, ctr.y);       // centre it (z-up model -> y-up scene: scene y = model z, scene z = -model y)
+    root.position.set(-ctr.x, -ctr.z, ctr.y);
+    water.mesh.position.y = (c.waterZ || 0) - ctr.z;
+    var sz = new THREE.Vector3(); box.getSize(sz); dist = sz.length() * 1.15;
+    $('hud').textContent = c.name + ' \u00b7 ' + c.parts.reduce(function (a, p) { return a + p.q; }, 0) + ' faces';
+  }
+  var dsel = $('dock'), psel = $('pal');
+  comps.slice().sort(function (a, b) { return a.id < b.id ? -1 : 1; }).forEach(function (c) { var o = document.createElement('option'); o.value = c.id; o.textContent = c.name; dsel.appendChild(o); });
+  var po = document.createElement('option'); po.value = 'own'; po.textContent = 'Own colours (sea tile)'; psel.appendChild(po);
+  // the 16 palette rows come in two sets of eight with the same colour sequence (rows 0-7 and 8-15); the names are my reading of their colours, not game labels
+  var PNAME = ['blue-grey', 'warm', 'orange', 'dark red', 'night blue', 'bright warm', 'bright grey', 'grey-blue'];
+  for (var k = 0; k < 16; k++) { var o = document.createElement('option'); o.value = k; o.textContent = 'Palette ' + k + ' (' + PNAME[k % 8] + (k === 15 ? ', dock default' : '') + ')'; if (k === 15) o.title = 'The dock\'s map record names palette 15'; psel.appendChild(o); }
+  var go = document.createElement('option'); go.value = 'game'; go.textContent = 'Game palette (follows the time)'; go.title = 'The game\'s own sea palette for the chosen time and weather (MAP.BIN 16, decoded)'; psel.insertBefore(go, psel.firstChild);
+  psel.value = 'game';
+  if (want && comps.some(function (c) { return c.id === want; })) dsel.value = want;
+  dsel.onchange = function () { location.hash = dsel.value; show(comps.find(function (c) { return c.id === dsel.value; })).then(function () { applyClock(+$('clk').value); }); };
+  psel.onchange = function () { if (psel.value === 'game') applyClock(+$('clk').value); else water.setOptions({ row: psel.value === 'own' ? 'own' : +psel.value }); };
+  $('water').onclick = function () { var on = this.getAttribute('aria-pressed') !== 'true'; this.setAttribute('aria-pressed', on); water.mesh.visible = on; };
+  $('objs').onclick = function () { var on = this.getAttribute('aria-pressed') !== 'true'; this.setAttribute('aria-pressed', on); if (objGroup) objGroup.visible = on; };
+  // ---- game clock (decoded, see notes/weather.md): data/weather.json made by tools/decode_weather.py running the game's own routine 0x148b78 / 0x146390.
+  // clock_all.json (tools/decode_weather.py, the game's own 0x148b78 run in tools/mips_emu.py): light set 0 (the dock map records'), every 2 game minutes, 13 weathers:
+  //   [phase_a, phase_b, blend 0..1024, sea palette set (-1 = the game leaves the palette as it was), colour0, flash colour, colour2, floats7, light9]. The sea palette is MAP.BIN 16
+  //   (dock record's sea file index 0 -> 0x10 + 0): palette = lerp(phase_a row, phase_b row, blend / 1024) of set s (the game's 0x146318, truncating division).
+  //   floats: [0] horizon-band distance, [3] fog far (near = 0), [4] light scale (128 = 1). light9 = the sky colour stops (slot 4 = horizon = fog colour).
+  var CK = await (await fetch('water/clock_all.json', { cache: 'no-cache' })).json(), sea = new Uint8Array(await (await fetch('water/sea_map16.bin')).arrayBuffer()), lastSet = 0;
+  var MAPU = 4096;                                                                                  // 1 map unit (fog distances, PSM0 floats) = 4096 model units on this page
+  function seaPal(st, pa, pb, f) { var o = new Uint8Array(1024), A = st * 8192 + pa * 1024, B = st * 8192 + pb * 1024; for (var k = 0; k < 1024; k++) { var a = sea[A + k], b = sea[B + k]; o[k] = (pa === pb || f === 0) ? a : f === 1024 ? b : a + Math.trunc((b - a) * f / 1024); } return o; }
+  function lum(c) { return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]; }
+  function amb(r) { return [0, 1, 2].map(function (i) { return Math.min(255, (r[4][i] + r[5][i]) * r[7][4] / 128); }); }  // (colour0 + flash) x float4 / 128 (0x225150)
+  function hex(c) { return '#' + c.map(function (v) { return ('0' + Math.round(v).toString(16)).slice(-2); }).join(''); }
+  // the game's sky: vertical gradient, colour stop i (phase colour slot i) at elevation CK.sky_stops_deg[i]; drawn as a sphere around the camera, no fog
+  var skyGeo = new THREE.SphereGeometry(5e6, 16, 180), skyCol = new Float32Array(skyGeo.attributes.position.count * 3); skyGeo.setAttribute('color', new THREE.BufferAttribute(skyCol, 3));
+  var sky = new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false })); sky.renderOrder = -2; scene.add(sky);
+  function skyColour(L, el) {
+    var S = CK.sky_stops_deg; if (el >= S[0]) return L[0];
+    for (var i = 1; i < 8; i++) if (el >= S[i]) { var t = (S[i - 1] - el) / (S[i - 1] - S[i]); return [0, 1, 2].map(function (k) { return L[i - 1][k] + (L[i][k] - L[i - 1][k]) * t; }); }
+    return L[7];
+  }
+  // --- weather effects: CK.effects[w] = [type (1 mist, 2 rain, 3 snow?), count, day colour B,G,R,A, night colour, mist density, fall speed ratio, lightning]
+  var MAXP = 3000, fx = { w: 0, night: 0, fogNear: 0, fogFar: 0, flash: 0, nextFlash: 3 }, seeds = new Float32Array(MAXP * 4);
+  for (var i = 0; i < seeds.length; i++) seeds[i] = Math.random();
+  var rainPos = new Float32Array(MAXP * 6), rainGeo = new THREE.BufferGeometry(); rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+  var rain = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ transparent: true, fog: false, depthWrite: false })); rain.frustumCulled = false; scene.add(rain);
+  var snowPos = new Float32Array(MAXP * 3), snowGeo = new THREE.BufferGeometry(); snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos, 3));
+  var dot = document.createElement('canvas'); dot.width = dot.height = 32; (function (g) { var gr = g.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 32, 32); })(dot.getContext('2d'));
+  var snow = new THREE.Points(snowGeo, new THREE.PointsMaterial({ map: new THREE.CanvasTexture(dot), transparent: true, depthWrite: false, fog: false, sizeAttenuation: true })); snow.frustumCulled = false; scene.add(snow);
+  var flashLight = new THREE.AmbientLight(0xffffff, 0); scene.add(flashLight);
+  function fxColour(e) {   // day / night particle colour, blended by how far the clock is into the night phase 4 (the game has only day and night records for these weathers)
+    var d = e[2], n = e[3], k = fx.night, c = [0, 1, 2, 3].map(function (i) { return d[i] + (n[i] - d[i]) * k; });
+    return { rgb: new THREE.Color(Math.min(1, c[2] / 128), Math.min(1, c[1] / 128), Math.min(1, c[0] / 128)), a: Math.min(1, c[3] / 128) };
+  }
+  function fxApply(w, pa, pb, f) {
+    fx.w = w; fx.night = pa === 4 && pb === 4 ? 1 : pb === 4 ? f / 1024 : pa === 4 ? 1 - f / 1024 : 0;
+    var e = CK.effects[w], on = $('gfx').checked, c = fxColour(e);
+    rain.visible = on && e[0] === 2; snow.visible = on && e[0] === 3;
+    rain.material.color.copy(c.rgb); rain.material.opacity = Math.min(1, c.a * 1.6); snow.material.color.copy(c.rgb); snow.material.opacity = c.a;
+    rainGeo.setDrawRange(0, Math.min(MAXP, e[1]) * 2); snowGeo.setDrawRange(0, Math.min(MAXP, e[1]));
+    if (!(on && e[6])) { fx.flash = 0; flashLight.intensity = 0; }
+  }
+  function fxTick(t, dt) {
+    var e = CK.effects[fx.w], B = Math.max(60000, dist * 0.7), cx = cam.position.x, cy = cam.position.y, cz = cam.position.z;
+    function wrap(v, c) { return c - B / 2 + ((v - c + B / 2) % B + B) % B; }
+    if (rain.visible || snow.visible) {
+      var n = Math.min(MAXP, e[1]), v = e[5] * B * 1.3;                            // fall speed: decoded ratio (rain 1.0, snow 0.2) x my scale
+      for (var i = 0; i < n; i++) {
+        var s = 4 * i, x = wrap(seeds[s] * B * 7, cx), z = wrap(seeds[s + 2] * B * 7, cz), y = wrap(seeds[s + 1] * B * 7 - t * v * (0.85 + 0.3 * seeds[s + 3]), cy);
+        if (rain.visible) { var L = v * 0.025; rainPos.set([x, y, z, x + v * 0.004, y + L, z], 6 * i); }
+        else snowPos.set([x + Math.sin(t * 0.7 + seeds[s] * 40) * B * 0.01, y, z + Math.cos(t * 0.5 + seeds[s + 2] * 40) * B * 0.01], 3 * i);
+      }
+      rainGeo.attributes.position.needsUpdate = rain.visible; snowGeo.attributes.position.needsUpdate = snow.visible; snow.material.size = B * 0.012;
+    }
+    if ($('gfx').checked && e[6]) {                                                 // lightning (weathers 4, 7): flash timing is mine; fog during the flash is the game's (0x147230)
+      fx.nextFlash -= dt;
+      if (fx.nextFlash <= 0) { fx.flash = 0.25; fx.nextFlash = 4 + Math.random() * 8; }
+      if (fx.flash > 0) {
+        fx.flash -= dt; var k = Math.max(0, fx.flash / 0.25) * (Math.sin(fx.flash * 60) > -0.3 ? 1 : 0.3); flashLight.intensity = 2.5 * k;
+        if (scene.fog) { scene.fog.near = k > 0.2 ? 100 * MAPU : fx.fogNear; scene.fog.far = k > 0.2 ? 2 * 1980 * MAPU : fx.fogFar; }
+      } else if (flashLight.intensity) { flashLight.intensity = 0; if (scene.fog) { scene.fog.near = fx.fogNear; scene.fog.far = fx.fogFar; } }
+    }
+  }
+  function applyClock(m) {
+    m = Math.round(m / 2) * 2 % 1440; if (document.activeElement !== $('clkt')) $('clkt').value = fmtT(m);
+    var w = +$('wth').value, r = CK.weathers[w][m / 2], pa = r[0], pb = r[1], f = r[2], st = r[3], L = r[8], game = $('gsky').checked;
+    $('clkv').textContent = ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + m % 60).slice(-2) + '  phases ' + pa + '>' + pb + ' (' + f + '/1024)';
+    $('clkv').title = 'game values (weather ' + w + ', light set 0): colour0 ' + hex(r[4]) + ', flash ' + hex(r[5]) + ', ambient ' + hex(amb(r)) + ', fog colour ' + hex(L[4]) + ', fog far ' + r[7][3] + ', floats ' + r[7].join(' ');
+    if (st >= 0) lastSet = st;                                                                      // -1: the game keeps the previous palette (0x148eb4)
+    if (psel.value === 'game') water.setGamePalette(seaPal(lastSet, pa, pb, f));
+    var p = skyGeo.attributes.position;
+    for (var k = 0; k < p.count; k++) { var c = skyColour(L, Math.asin(Math.max(-1, Math.min(1, p.getY(k) / 5e6))) * 57.29578); skyCol[3 * k] = c[0] / 255; skyCol[3 * k + 1] = c[1] / 255; skyCol[3 * k + 2] = c[2] / 255; }
+    skyGeo.attributes.color.needsUpdate = true; sky.visible = game;
+    if (game) { scene.fog = new THREE.Fog(new THREE.Color(L[4][0] / 255, L[4][1] / 255, L[4][2] / 255), 0, r[7][3] * MAPU); water.setOptions({ fogNear: 0, fogFar: r[7][3] * MAPU }); water.uniforms.uFog.value.copy(scene.fog.color); }
+    else { scene.fog = null; water.setOptions({ fogFar: 0 }); }
+    fx.fogNear = 0; fx.fogFar = r[7][3] * MAPU; fxApply(w, pa, pb, f);
+    var ref = amb(CK.weathers[0][360]), fac = $('gdim').checked ? Math.min(1, lum(amb(r)) / lum(ref)) : 1;   // game ambient relative to clear noon
+    root.children.forEach(function (mm) { if (mm.isMesh && mm.material.vertexColors) mm.material.color.setScalar(fac * +$('bri').value); });
+    if (objGroup) objGroup.children.forEach(function (mm) { if (!mm.userData.glow) mm.material.color.setScalar(fac * +$('bri').value); });
+    var on = m < 360 || m >= 1070;                                                                    // lamps: MY rule (game rule not decoded) - the game's star window (before 06:00, after 18:00) widened to the evening phase 2
+    $('lights').setAttribute('aria-pressed', on); if (objGroup) objGroup.children.forEach(function (mm) { if (mm.userData.glow) mm.visible = on; });
+  }
+  // free-entry time: "20", "2030", "20:30", "8:05" -> minutes since midnight (applyClock rounds to the game's 2-minute steps)
+  function parseTime(t) { var m = /^\s*(\d{1,2})(?::?(\d{2}))?\s*$/.exec(t); if (!m) return null; var h = +m[1], mi = m[2] ? +m[2] : 0; return h < 24 && mi < 60 ? h * 60 + mi : null; }
+  function commitTime() { var v = parseTime($('clkt').value); if (v == null) { $('clkt').value = fmtT(+$('clk').value); return; } $('clk').value = v; applyClock(v); }
+  function fmtT(m) { m = Math.round(m / 2) * 2 % 1440; return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + m % 60).slice(-2); }
+  $('clkt').onchange = commitTime; $('clkt').onkeydown = function (e) { if (e.key === 'Enter') commitTime(); };
+  $('wth').onchange = $('gsky').onchange = $('gdim').onchange = $('gfx').onchange = function () { applyClock(+$('clk').value); };
+  function addOpt(sel, v, t) { var o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); }
+  function p2(n) { return ('0' + n).slice(-2); }
+  var MINFO = {}; try { MINFO = await (await fetch('campaign_info.json')).json(); } catch (e) {}
+  CK.missions.forEach(function (m, i) {
+    var inf = MINFO[m[0].replace(/_/g, '-')], ev = (m[5] || []).map(function (e) { return 'w' + e[1]; }).join('/');
+    addOpt($('mis'), i, (inf && inf.name) || m[0]);
+    var o = $('mis').lastChild; o.title = m[0] + ' · start ' + p2(m[1]) + ':' + p2(m[2]) + '' + (ev ? ' · event weather ' + ev : '');
+  });
+  function setClock(m) { $('clk').value = m; applyClock(m); }
+  $('mis').onchange = function () { if (this.value === '') return; var m = CK.missions[+this.value]; $('wth').value = String(m[4] == null ? 0 : m[4]); setClock(m[1] * 60 + m[2]); };   // weather: stage weights (0) unless the mission's event script sets one on load (m[4], decoded; timing caveat in notes/weather.md)
+  psel.addEventListener('change', function () { });
+  applyClock(720);
+  $('lights').onclick =function () { var on = this.getAttribute('aria-pressed') !== 'true'; this.setAttribute('aria-pressed', on); if (objGroup) objGroup.children.forEach(function (m) { if (m.userData.glow) m.visible = on; }); };
+  $('turn').onchange = function () { if (objGroup) objGroup.children.forEach(function (m) { m.rotation.z = yawOf(m.userData.o); }); };
+  // the dock and the props both follow Brightness, times the game light level (same factor as applyClock; not calling it so the Lights button and weather stay as they are)
+  $('bri').oninput = function () {
+    var r = CK.weathers[+$('wth').value][Math.round(+$('clk').value / 2) % 720], ref = amb(CK.weathers[0][360]), fac = $('gdim').checked ? Math.min(1, lum(amb(r)) / lum(ref)) : 1, b = fac * +$('bri').value;
+    root.children.forEach(function (m) { if (m.isMesh && m.material.vertexColors) m.material.color.setScalar(b); });
+    if (objGroup) objGroup.children.forEach(function (m) { if (!m.userData.glow) m.material.color.setScalar(b); });
+  };
+  $('wire').onclick = function () { wire = !wire; this.setAttribute('aria-pressed', wire); root.children.forEach(function (m) { m.material.wireframe = wire; }); };
+  $('shot').onclick = function () { renderer.render(scene, cam); cv.toBlob(function (b) { var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'drydock.png'; a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000); }); };
+  var drag = null;
+  cv.onpointerdown = function (e) { drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; };
+  cv.onpointermove = function (e) { if (!drag) return; yaw -= (e.clientX - drag[0]) * 0.006; pitch = Math.max(0.03, Math.min(1.5, pitch + (e.clientY - drag[1]) * 0.006)); drag = [e.clientX, e.clientY]; };
+  cv.onpointerup = cv.onpointercancel = function () { drag = null; cv.style.cursor = 'grab'; };
+  cv.onwheel = function (e) { e.preventDefault(); dist = Math.max(20000, Math.min(2e6, dist * (e.deltaY < 0 ? 0.9 : 1.1))); };
+  function resize() { var w = cv.clientWidth, h = cv.clientHeight, d = Math.min(2, devicePixelRatio || 1); if (w !== rw || h !== rh || d !== dpr) { rw = w; rh = h; dpr = d; renderer.setPixelRatio(d); renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); } }
+  await show(comps.find(function (c) { return c.id === dsel.value; })); applyClock(+$('clk').value); var t0 = performance.now();
+  (function tick() {
+    var tnow = (performance.now() - t0) / 1000, dt = Math.min(0.1, tnow - (tick.last || 0)); tick.last = tnow;
+    resize(); water.update(tnow);
+    sky.position.copy(cam.position); scene.background = $('gsky').checked ? null : water.uniforms.uFog.value;   // unchecked: the old fog colour derived from the palette (my approximation)
+    cam.position.set(Math.sin(yaw) * Math.cos(pitch) * dist + tx, Math.sin(pitch) * dist + ty, Math.cos(yaw) * Math.cos(pitch) * dist + tz); cam.lookAt(tx, ty, tz);
+    fxTick(tnow, dt);
+    renderer.render(scene, cam); requestAnimationFrame(tick);
+  })();
+})();
+</script>
+</body>
+</html>
+

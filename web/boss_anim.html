@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boss Animations</title>
+<style>
+:root{--bg:#0a101c;--panel:#111a2b;--line:#2a3a55;--text:#dbe6f5;--muted:#8aa0bd;--accent:#5cc8ff;--rest:#3a4a66}
+@media (prefers-color-scheme:light){:root{--bg:#f3f6fa;--panel:#fff;--line:#c9d3e0;--text:#16202e;--muted:#5a6b82;--accent:#0a6fb5;--rest:#b8c4d6}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:4px 0 6px}
+p.note{color:var(--muted);margin:0 0 12px;max-width:80ch}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+button,.chip{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer}
+button:hover,.chip:hover{border-color:var(--accent)}
+button[aria-pressed=true],.chip[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}
+#stage{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+#cv{display:block;width:100%;height:min(62vh,560px);touch-action:none;cursor:grab}
+#hud{position:absolute;left:10px;top:8px;color:var(--muted);font-size:12px;pointer-events:none}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0}
+.row label{color:var(--muted);font-size:13px}
+input[type=range]{accent-color:var(--accent)}
+#frame{flex:1;min-width:180px}
+input[type=number]{width:64px;font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 6px}
+#segs{display:flex;gap:6px;flex-wrap:wrap;max-height:150px;overflow:auto}
+.chip.rest{border-style:dashed;color:var(--muted);border-color:var(--rest)}
+.mono{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<script src="nav.js"></script>
+<main>
+  <h1>Boss animations</h1>
+  <p class="note">Every keyframe stored in the boss models, played back. The chips are the game's own clips, read from each model's header: a clip is a list of steps, each showing one pose for a set number of ticks. Chip names are only given where the game code that starts the clip was read (Hell Atsche and its Supports) or where it was remembered from the game (the Lord of Terror's dance); an unnamed clip's use is not known. The tick rate is assumed to be 60 per second (the Speed slider scales it, 15 = normal). "Blend steps" mixes each step into the next one, node by node, as the game's code appears to (the exact rule is assumed). Cannon aiming, beams and weapon firing are driven by code, not by clips. Drag to turn the model, scroll to zoom.</p>
+  <div class="tabs" id="tabs" role="group" aria-label="Model"></div>
+  <div id="stage"><canvas id="cv"></canvas><div id="hud" class="mono"></div></div>
+  <div class="row">
+    <button id="play" aria-pressed="false">Play</button>
+    <button id="prev" title="Previous frame">&#9664;</button>
+    <button id="next" title="Next frame">&#9654;</button>
+    <input id="frame" type="range" min="0" max="0" value="0" aria-label="Frame">
+    <span class="mono" id="fnum">0 / 0</span>
+  </div>
+  <div class="row">
+    <label>Speed <input id="fps" type="range" min="1" max="60" value="15"> <span class="mono" id="fpsv">15</span> fps</label>
+    <label>Loop from <input id="lo" type="number" min="0" value="0"> to <input id="hi" type="number" min="0" value="0"></label>
+    <button id="loop" aria-pressed="true">Loop</button>
+    <button id="all">Whole animation</button>
+    <button id="blend" aria-pressed="true" title="Blend between the steps of a clip instead of jumping (the game appears to do this; the exact rule is assumed)">Blend steps</button>
+    <button id="wire" aria-pressed="false">Wireframe</button>
+  </div>
+  <div id="segs" role="group" aria-label="Segments"></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  var cv = document.getElementById('cv'), hud = document.getElementById('hud');
+  var renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
+  var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(35, 1, 1, 1e6), grp = new THREE.Group();
+  scene.add(grp); scene.add(new THREE.HemisphereLight(0xffffff, 0x667788, 1.6));
+  var dl = new THREE.DirectionalLight(0xffffff, 1.0); dl.position.set(1, 2, 1.5); scene.add(dl);
+  grp.rotation.x = -Math.PI / 2;
+  var clip = null, stp = 0, stpT = 0, blendOn = true;
+  var meta = [], cur = null, mesh = null, pos = null, geo = null, mat = null, frame = 0, playing = false, lo = 0, hi = 0, loop = true, fps = 15, acc = 0, lastT = null;
+  var yaw = 0.7, pitch = 0.25, zoom = 1, R = 1, ctr = new THREE.Vector3(), cache = {};
+  var $ = function (id) { return document.getElementById(id); };
+
+  var rw = 0, rh = 0, rd = 0;
+  function resize() { var w = cv.clientWidth, h = cv.clientHeight, d = Math.min(2, devicePixelRatio || 1); if (w !== rw || h !== rh || d !== rd) { rw = w; rh = h; rd = d; renderer.setPixelRatio(d); renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); } }
+  async function load(m) {
+    if (cache[m.id]) return cache[m.id];
+    var buf = await (await fetch('models/anim_' + m.id + '.bin', { cache: 'no-cache' })).arrayBuffer();
+    var dv = new DataView(buf), nf = dv.getUint16(0, true), nv = dv.getUint16(2, true), nq = dv.getUint16(4, true), o = 8;
+    var quads = new Uint16Array(buf.slice(o, o + nq * 8)); o += nq * 8;
+    var uvs = new Uint16Array(buf.slice(o, o + nq * 16)); o += nq * 16;
+    var fr = new Float32Array(buf.slice(o, o + nf * nv * 12));
+    var corner = [], uv = [];
+    for (var k = 0; k < nq; k++) {
+      var q = quads.subarray(k * 4, k * 4 + 4), tris = q[2] === q[3] ? [[0, 1, 2]] : [[0, 1, 2], [0, 2, 3]];
+      tris.forEach(function (t) { t.forEach(function (c) { corner.push(q[c]); uv.push(uvs[k * 8 + c * 2] / 16384, uvs[k * 8 + c * 2 + 1] / 16384); }); });
+    }
+    var box = new THREE.Box3();
+    for (var i = 0; i < nv * 3; i += 3) box.expandByPoint(new THREE.Vector3(fr[i], fr[i + 1], fr[i + 2]));      // frame the rest pose (frame 0): some animations (a sinking hull) travel far away
+    var tex = await new Promise(function (res) { new THREE.TextureLoader().load(m.tex, res, undefined, function () { res(null); }); });
+    if (tex) { tex.flipY = false; tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.encoding = THREE.sRGBEncoding; }
+    var sk = null;                                                                         // skeleton for blending (nodes_<id>.bin, tools/export_anim.py write_nodes)
+    try {
+      var nb = await (await fetch('models/nodes_' + m.id + '.bin', { cache: 'no-cache' })).arrayBuffer(), nd = new DataView(nb), nn = nd.getUint16(0, true), nfk = nd.getUint16(2, true), nvk = nd.getUint16(4, true), o2 = 8;
+      var par = new Uint16Array(nb.slice(o2, o2 + nn * 2)); o2 += nn * 2;
+      var rng = new Uint16Array(nb.slice(o2, o2 + nn * 4)); o2 += nn * 4; o2 = (o2 + 3) & ~3;
+      var lv = new Float32Array(nb.slice(o2, o2 + nvk * 12)); o2 += nvk * 12;
+      sk = { nn: nn, par: par, rng: rng, lv: lv, fr: new Float32Array(nb.slice(o2, o2 + nfk * nn * 28)), nv: nvk, out: new Float32Array(nvk * 3) };
+    } catch (e) { sk = null; }
+    return (cache[m.id] = { nf: nf, nv: nv, fr: fr, corner: corner, uv: uv, box: box, tex: tex, sk: sk });
+  }
+  // Blend two frames node by node (rotation along the short way round, position and scale linearly), then place the vertices: same maths as tools/psc1.py node_transforms + bake.
+  function rotM(rx, ry, rz) {
+    var k = Math.PI * 2 / 65536, cx = Math.cos(rx * k), sx = Math.sin(rx * k), cy = Math.cos(ry * k), sy = Math.sin(ry * k), cz = Math.cos(rz * k), sz = Math.sin(rz * k);
+    return [cz * cy, cz * sy * sx - sz * cx, cz * sy * cx + sz * sx, sz * cy, sz * sy * sx + cz * cx, sz * sy * cx - cz * sx, -sy, cy * sx, cy * cx];
+  }
+  function blend(fa, fb, t) {
+    var sk = cur.d.sk, nn = sk.nn, fr = sk.fr, W = new Array(nn), out = sk.out, lv = sk.lv, i;
+    function get(n) {
+      if (W[n]) return W[n];
+      var i, j;                                                                           // local: get() recurses and must not disturb the caller's loop counter
+      var a = (fa * nn + n) * 7, b = (fb * nn + n) * 7, r = [], T = [], s = fr[a + 6] + (fr[b + 6] - fr[a + 6]) * t;
+      for (j = 0; j < 3; j++) { var d = ((fr[b + j] - fr[a + j] + 32768) % 65536 + 65536) % 65536 - 32768; r.push(fr[a + j] + d * t); T.push(fr[a + 3 + j] + (fr[b + 3 + j] - fr[a + 3 + j]) * t); }
+      var M = rotM(r[0], r[1], r[2]), p = sk.par[n];
+      if (p !== 0xffff && p < nn && p !== n) {
+        var P = get(p), q = [P.M[0] * T[0] + P.M[1] * T[1] + P.M[2] * T[2], P.M[3] * T[0] + P.M[4] * T[1] + P.M[5] * T[2], P.M[6] * T[0] + P.M[7] * T[1] + P.M[8] * T[2]];
+        T = [q[0] * P.s + P.T[0], q[1] * P.s + P.T[1], q[2] * P.s + P.T[2]]; s *= P.s;
+        var N = new Array(9); for (i = 0; i < 3; i++) for (j = 0; j < 3; j++) N[i * 3 + j] = P.M[i * 3] * M[j] + P.M[i * 3 + 1] * M[3 + j] + P.M[i * 3 + 2] * M[6 + j];
+        M = N;
+      }
+      return (W[n] = { M: M, T: T, s: s });
+    }
+    out.set(lv);
+    for (i = 0; i < nn; i++) {
+      var w = get(i), M = w.M, e = Math.min(sk.rng[2 * i + 1], sk.nv);
+      for (var v = sk.rng[2 * i]; v < e; v++) {
+        var x = lv[v * 3], y = lv[v * 3 + 1], z = lv[v * 3 + 2];
+        out[v * 3] = (M[0] * x + M[1] * y + M[2] * z) * w.s + w.T[0]; out[v * 3 + 1] = (M[3] * x + M[4] * y + M[5] * z) * w.s + w.T[1]; out[v * 3 + 2] = (M[6] * x + M[7] * y + M[8] * z) * w.s + w.T[2];
+      }
+    }
+  }
+  function setBlend(fa, fb, t) {
+    var d = cur.d, c = d.corner, out = d.sk.out; blend(fa, fb, t); frame = fa;
+    for (var i = 0; i < c.length; i++) { var s = c[i] * 3; pos[i * 3] = out[s]; pos[i * 3 + 1] = out[s + 1]; pos[i * 3 + 2] = out[s + 2]; }
+    geo.attributes.position.needsUpdate = true; geo.computeVertexNormals();
+    $('frame').value = fa; $('fnum').textContent = fa + ' > ' + fb + ' (' + Math.round(t * 100) + '%)';
+    hud.textContent = cur.m.name + '  frame ' + fa + ' > ' + fb + '  clip ' + clip.id + (clip.label ? ' (' + clip.label + ')' : '') + '  step ' + (stp + 1) + '/' + clip.steps.length;
+  }
+  function setFrame(f) {
+    frame = Math.max(0, Math.min(cur.d.nf - 1, f));
+    var d = cur.d, base = frame * d.nv * 3, c = d.corner;
+    for (var i = 0; i < c.length; i++) { var s = base + c[i] * 3; pos[i * 3] = d.fr[s]; pos[i * 3 + 1] = d.fr[s + 1]; pos[i * 3 + 2] = d.fr[s + 2]; }
+    geo.attributes.position.needsUpdate = true; geo.computeVertexNormals();
+    $('frame').value = frame; $('fnum').textContent = frame + ' / ' + (d.nf - 1);
+    hud.textContent = cur.m.name + '  frame ' + frame + (clip ? '  clip ' + clip.id + (clip.label ? ' (' + clip.label + ')' : '') + '  step ' + (stp + 1) + '/' + clip.steps.length : '');
+    Array.prototype.forEach.call($('segs').children, function (b) { b.setAttribute('aria-pressed', clip && +b.dataset.c === clip.id ? 'true' : 'false'); });
+  }
+  function stopClip() { clip = null; Array.prototype.forEach.call($('segs').children, function (b) { b.setAttribute('aria-pressed', 'false'); }); }
+  function playClip(c) { clip = c; stp = 0; stpT = 0; playing = true; $('play').textContent = 'Pause'; $('play').setAttribute('aria-pressed', 'true'); setFrame(c.steps[0][0]); }
+  function setRange(a, b) { lo = Math.max(0, a); hi = Math.min(cur.d.nf - 1, b); $('lo').value = lo; $('hi').value = hi; }
+  async function select(i) {
+    var m = meta[i], d = await load(m); cur = { m: m, d: d };
+    var sl = $('tabs').firstChild; if (sl) sl.value = i;
+    if (mesh) { grp.remove(mesh); geo.dispose(); mat.dispose(); }
+    geo = new THREE.BufferGeometry(); pos = new Float32Array(d.corner.length * 3);
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(d.uv, 2));
+    mat = new THREE.MeshStandardMaterial({ color: d.tex ? 0xffffff : 0x8fb4d8, map: d.tex, metalness: 0.05, roughness: 0.8, side: THREE.DoubleSide, transparent: !!d.tex, alphaTest: d.tex ? 0.4 : 0, wireframe: $('wire').getAttribute('aria-pressed') === 'true' });
+    mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; grp.add(mesh);
+    d.box.getCenter(ctr); var sz = new THREE.Vector3(); d.box.getSize(sz); R = sz.length() / 2; mesh.position.set(-ctr.x, -ctr.y, -ctr.z);
+    zoom = 1; $('frame').max = d.nf - 1; setRange(0, d.nf - 1);
+    var sg = $('segs'); sg.textContent = ''; clip = null;
+    m.clips.forEach(function (c) {
+      var ticks = c.steps.reduce(function (a, s) { return a + (s[1] >= 9999 ? 0 : s[1]); }, 0), fl = c.steps.map(function (s) { return s[0]; });
+      var b = document.createElement('button'); b.className = 'chip'; b.dataset.c = c.id;
+      b.textContent = 'Clip ' + c.id + (c.label ? ' ' + c.label : '') + ' (' + Math.min.apply(null, fl) + '-' + Math.max.apply(null, fl) + ')';
+      b.title = c.steps.length + ' step(s), ' + ticks + ' ticks' + (c.hold ? ', then holds the last pose' : '') + '; file value ' + c.count;
+      b.onclick = function () { playClip(c); };
+      sg.appendChild(b);
+    });
+    setFrame(0); placeCam();
+  }
+  function placeCam() { var dist = R * 2.6 / zoom; cam.position.set(Math.sin(yaw) * Math.cos(pitch) * dist, Math.sin(pitch) * dist, Math.cos(yaw) * Math.cos(pitch) * dist); cam.lookAt(0, 0, 0); cam.near = dist / 100; cam.far = dist * 20; cam.updateProjectionMatrix(); }
+  function tick(t) {
+    var dt = lastT === null ? 0 : Math.min(100, t - lastT); lastT = t;
+    if (cur && playing && clip) {
+      stpT += dt * fps * 4 / 1000;                                                       // ticks; 15 on the slider = 60 ticks per second
+      var st = clip.steps[stp];
+      while (st[1] < 9999 && stpT >= st[1]) {
+        stpT -= st[1];
+        if (stp + 1 < clip.steps.length) stp++; else if (loop) stp = 0; else { playing = false; $('play').textContent = 'Play'; $('play').setAttribute('aria-pressed', 'false'); break; }
+        st = clip.steps[stp]; setFrame(st[0]);
+      }
+      var nx = clip.steps[stp + 1];                                                       // blend towards the next step's frame during this step (assumed: the game's blend value runs 0..1 over a step)
+      if (blendOn && cur.d.sk && playing && st[1] < 9999 && nx && nx[0] !== st[0]) setBlend(st[0], nx[0], Math.min(1, stpT / st[1]));
+    } else if (cur && playing) {
+      acc += dt * fps / 1000;
+      while (acc >= 1) { acc -= 1; var n = frame + 1; if (n > hi) { if (loop) n = lo; else { n = hi; playing = false; $('play').textContent = 'Play'; $('play').setAttribute('aria-pressed', 'false'); } } setFrame(n); }
+    }
+    resize(); renderer.render(scene, cam); requestAnimationFrame(tick);
+  }
+  // Still image of a clip at a given tick offset (blended like playback), used to make the looping tile on index.html. o = { loop, yaw, pitch, zoom, ox, oy } (ox/oy shift the view, in model units).
+  // Resolves to a PNG blob with a transparent background. Rendering happens in the same task as toBlob, so it works while the page is hidden.
+  window.bossAnimShot = function (clipId, ticks, w, h, o) {
+    o = o || {}; var c = cur.m.clips.find(function (x) { return x.id === clipId; }), t = ticks, i = 0;
+    while (i < c.steps.length - 1 && t >= c.steps[i][1]) { t -= c.steps[i][1]; i++; }
+    clip = c; stp = i; stpT = t;
+    var st = c.steps[i], nx = c.steps[i + 1] || (o.loop ? c.steps[0] : null);
+    if (cur.d.sk && nx && st[1] < 9999 && nx[0] !== st[0]) setBlend(st[0], nx[0], t / st[1]); else setFrame(st[0]);
+    yaw = o.yaw != null ? o.yaw : yaw; pitch = o.pitch != null ? o.pitch : pitch; zoom = o.zoom || 1; placeCam();
+    cam.aspect = w / h; if (o.ox || o.oy) { cam.position.x += o.ox || 0; cam.position.y += o.oy || 0; cam.lookAt(o.ox || 0, o.oy || 0, 0); } cam.updateProjectionMatrix();
+    renderer.setPixelRatio(1); renderer.setSize(w, h, false); rw = 0;                  // rw = 0: the page's own resize() puts the size back later
+    renderer.render(scene, cam);
+    return new Promise(function (res) { renderer.domElement.toBlob(res, 'image/png'); });
+  };
+  // controls
+  $('play').onclick = function () { playing = !playing; if (playing && (frame < lo || frame > hi)) setFrame(lo); this.textContent = playing ? 'Pause' : 'Play'; this.setAttribute('aria-pressed', playing); };
+  $('prev').onclick = function () { playing = false; stopClip(); $('play').textContent = 'Play'; setFrame(frame - 1); };
+  $('next').onclick = function () { playing = false; stopClip(); $('play').textContent = 'Play'; setFrame(frame + 1); };
+  $('frame').oninput = function () { playing = false; stopClip(); $('play').textContent = 'Play'; setFrame(+this.value); };
+  $('fps').oninput = function () { fps = +this.value; $('fpsv').textContent = fps; };
+  $('lo').onchange = $('hi').onchange = function () { stopClip(); setRange(+$('lo').value, +$('hi').value); };
+  $('loop').onclick = function () { loop = !loop; this.setAttribute('aria-pressed', loop); };
+  $('all').onclick = function () { stopClip(); setRange(0, cur.d.nf - 1); };
+  $('blend').onclick = function () { blendOn = !blendOn; this.setAttribute('aria-pressed', blendOn); };
+  $('wire').onclick = function () { var on = this.getAttribute('aria-pressed') !== 'true'; this.setAttribute('aria-pressed', on); if (mat) mat.wireframe = on; };
+  var drag = null;
+  cv.onpointerdown = function (e) { drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; };
+  cv.onpointermove = function (e) { if (!drag) return; yaw -= (e.clientX - drag[0]) * 0.008; pitch = Math.max(-1.5, Math.min(1.5, pitch + (e.clientY - drag[1]) * 0.008)); drag = [e.clientX, e.clientY]; placeCam(); };
+  cv.onpointerup = cv.onpointercancel = function () { drag = null; cv.style.cursor = 'grab'; };
+  cv.onwheel = function (e) { e.preventDefault(); zoom = Math.max(0.3, Math.min(6, zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1))); placeCam(); };
+  document.addEventListener('keydown', function (e) { if (e.target.tagName === 'INPUT') return; if (e.key === ' ') { e.preventDefault(); $('play').click(); } else if (e.key === 'ArrowRight') $('next').click(); else if (e.key === 'ArrowLeft') $('prev').click(); });
+
+  fetch('models/boss_anim.json', { cache: 'no-cache' }).then(function (r) { return r.json(); }).then(function (m) {
+    meta = m; var sel = document.createElement('select'), groups = {}, want = (location.hash || '').slice(1);
+    sel.setAttribute('aria-label', 'Model'); sel.style.cssText = 'font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px';
+    m.forEach(function (x, i) {
+      var g = groups[x.boss || 'Other']; if (!g) { g = groups[x.boss || 'Other'] = document.createElement('optgroup'); g.label = x.boss || 'Other'; sel.appendChild(g); }
+      var o = document.createElement('option'); o.value = i; o.textContent = x.name + ' - ' + x.frames + ' frames, ' + x.clips.length + ' clips'; g.appendChild(o);
+      if (x.id === want) sel.value = i;
+    });
+    sel.onchange = function () { playing = false; $('play').textContent = 'Play'; location.hash = meta[+sel.value].id; select(+sel.value); };
+    $('tabs').appendChild(sel); select(+sel.value || 0); requestAnimationFrame(tick);
+  });
+})();
+</script>
+</body>
+</html>

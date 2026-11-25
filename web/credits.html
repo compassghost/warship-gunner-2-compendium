@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Warship Gunner 2 Compendium</title>
+<style>
+  :root { --bg: #0d1421; --panel: #152033; --line: #2a3a55; --text: #dbe6f5; --muted: #8aa0bd; --accent: #5cc8ff; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #eef2f7; --panel: #fff; --line: #c9d3e0; --text: #16202e; --muted: #5a6b82; --accent: #0a6fb5; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+  nav { margin-bottom: 8px; font-size: 14px; }
+  a { color: var(--accent); }
+  h1 { margin: 0 0 6px; font-size: 26px; }
+  h2 { margin: 32px 0 8px; font-size: 18px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  .lead { color: var(--muted); margin-top: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin: 10px 0; }
+  .card h3 { margin: 0 0 4px; font-size: 16px; }
+  .card p { margin: 2px 0; }
+  .meta { color: var(--muted); font-size: 13px; }
+  ul.names { columns: 2; padding-left: 18px; margin: 6px 0; }
+  @media (max-width: 480px) { ul.names { columns: 1; } }
+  .note { border-left: 3px solid var(--accent); padding: 6px 12px; background: rgba(92,200,255,.08); border-radius: 0 6px 6px 0; margin: 14px 0; }
+</style>
+<script src="shell.js" defer></script></head>
+<body><script src="nav.js"></script>
+<main>
+  <h1>Credits</h1>
+  <p class="lead">This project would have been far harder without a handful of dedicated GameFAQs contributors who catalogued Warship Gunner 2 by hand: reading values off screens and typing them into text files, with no extraction tools. </p>
+
+  <h2>Guide authors</h2>
+
+  <div class="card">
+    <h3>Bill Mulrooney (GameFAQs: bmulroon)</h3>
+    <p>Author of four guides, written in 2006&ndash;2007:</p>
+    <ul>
+      <li><a href="https://gamefaqs.gamespot.com/ps2/927547-warship-gunner-2/faqs/50104">Walkthrough</a> (v1.02, 2007), the source of the mission names, objectives, superweapon flags, rewards in points and funds, and the Inferno Mode unlock conditions</li>
+      <li><a href="https://gamefaqs.gamespot.com/ps2/927547-warship-gunner-2/faqs/47202">Weapons Reference Guide</a> (v1.00, 2007)</li>
+      <li><a href="https://gamefaqs.gamespot.com/ps2/927547-warship-gunner-2/faqs/45119">System Reference Guide</a> (v1.02, 2007)</li>
+      <li><a href="https://gamefaqs.gamespot.com/ps2/927547-warship-gunner-2/faqs/45562">Ship Reference Guide</a> (v1.01, 2006)</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Jeremy Kuris (GameFAQs: tankboy)</h3>
+    <p>Author of two reference guides, written over 2006&ndash;2011:</p>
+    <ul>
+      <li><a href="https://gamefaqs.gamespot.com/ps2/927547-warship-gunner-2/faqs/43120">Aircraft Reference</a> (v1.00, 2006)</li>
+      <li><a href="https://gamefaqs.gamespot.com/ps2/927547-warship-gunner-2/faqs/42655">Mission Pickups and Rewards</a> (v1.10, 2006&ndash;2011), the source of the flag unlock information and flag effects on the flag viewer</li>
+    </ul>
+  </div>
+
+  <h2>Save files</h2>
+  <p>The 1494/1500 and 1500/1500 save files used to cross-check unlock data were shared on GameFAQs by kriskoehler.</p>
+
+  <h2>AI assistance</h2>
+  <p>This project was built with the help of Claude, which assisted in downloading and back-fitting game files onto player knowledge.</p>
+
+  <h2>Game and tools</h2>
+  <p>Warship Gunner 2 is a game by Koei (PlayStation 2, 2005&ndash;2006). All game images, names and data belong to their respective owners. This is an unofficial fan research project and is not affiliated with or endorsed by the publisher.</p>
+  <p class="meta">Research tools used: 7-Zip, mymcplus (PS2 save formats), Pillow (images) and Capstone (disassembly of the game executable).</p>
+
+  <div class="note">
+    <strong>About the guides.</strong> Each guide carries a notice that it may be used for personal purposes and may not be republished on other websites. This site does not reproduce the guides' text. Where it shows facts that came from a guide (for example how a flag is unlocked), the source is credited on the page, and we are working towards taking values from the game's own data instead. If you are one of the authors or contributors named here and would like something credited differently, or removed, please tell us.
+  </div>
+</main>
+</body>
+</html>
+

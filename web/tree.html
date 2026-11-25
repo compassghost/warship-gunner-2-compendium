@@ -1,0 +1,760 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Warship Gunner 2 Compendium</title>
+<style>
+  :root { --bg:#0d1421; --panel:#152033; --line:#2a3a55; --text:#dbe6f5; --muted:#8aa0bd; --accent:#5cc8ff; --chip:#27384f; --chip2:#33475f; --edge:#6d86a6; --hl:#f2c14e; }
+  @media (prefers-color-scheme: light) { :root { --bg:#eef2f7; --panel:#fff; --line:#c9d3e0; --text:#16202e; --muted:#5a6b82; --accent:#0a6fb5; --chip:#e3eaf3; --chip2:#d3deeb; --edge:#7b8ea6; --hl:#b07a00; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.4 "Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif; }
+  header { padding:14px 16px 4px; max-width:1300px; margin:0 auto; }
+  h1 { margin:0 0 2px; font-size:20px; } .sub { margin:0; color:var(--muted); font-size:13px; }
+  nav { display:flex; flex-wrap:wrap; gap:6px; }
+  .shell { display:flex; gap:14px; max-width:1400px; margin:10px auto 0; padding:0 16px; align-items:flex-start; }
+  nav.side { flex:0 0 160px; flex-direction:column; flex-wrap:nowrap; position:sticky; top:calc(var(--sn-h,0px) + 8px); }
+  nav.side button.tab { text-align:left; width:100%; display:flex; justify-content:space-between; gap:8px; padding:8px 10px; }
+  .main { flex:1 1 auto; min-width:0; }
+  .topbar { display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; justify-content:space-between; }
+  .layout { display:flex; gap:6px; align-items:center; color:var(--muted); font-size:12px; }
+  .layout button.tab { padding:4px 9px; font-size:12px; }
+  nav.groups { padding-bottom:2px; }
+  @media (max-width:800px) { .shell { flex-direction:column; } nav.side { flex:none; flex-direction:row; flex-wrap:wrap; position:static; } nav.side button.tab { width:auto; } }
+  button.tab { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 10px; cursor:pointer; font:inherit; }
+  button.tab[aria-selected=true] { border-color:var(--accent); color:var(--accent); }
+  .count { color:var(--muted); font-size:12px; margin-left:4px; }
+  .wrap { display:flex; gap:12px; margin:8px 0 30px; align-items:flex-start; }
+  #view { flex:1 1 auto; min-width:0; max-height:72vh; overflow:auto; border:1px solid var(--line); border-radius:8px; background:var(--panel); position:relative; }
+  #stage { position:relative; }
+  svg#edges { position:absolute; left:0; top:0; pointer-events:none; }
+  .edge { stroke:var(--edge); stroke-width:1.5; fill:none; }
+  .edge.hl { stroke:var(--hl); stroke-width:2.5; }
+  .chip { position:absolute; width:118px; height:44px; background:var(--chip); border:1px solid var(--line); border-radius:5px; padding:3px 6px; cursor:pointer; text-align:center; overflow:hidden; color:var(--text); font:inherit; }
+  .chip .l { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .chip .c { font-size:11px; color:var(--text); }
+  .fan { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 12px; }
+  .cchip { width:150px; min-height:44px; background:var(--chip); border:1px solid var(--line); border-radius:5px; padding:3px 6px; cursor:pointer; text-align:center; color:var(--text); font:inherit; }
+  .cchip .l { font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .cchip .c { font-size:11px; }
+  .bpgrid { display:grid; grid-template-columns:100px repeat(4,160px); gap:6px; align-items:start; margin:6px 0 12px; }
+  .bph { font-weight:700; font-size:13px; color:var(--muted); padding-top:4px; } .bpcell { display:flex; flex-direction:column; gap:4px; }
+  .bpcell .cchip { width:160px; min-height:30px; }
+  .cchip.sel { outline:2px solid var(--accent); }
+  .wchips { display:flex; gap:4px; width:100%; } .wchip { flex:1 1 0; text-align:center; padding:2px 0; border-radius:5px; border:1px solid var(--line); font-size:12px; font-weight:600; opacity:.35; }
+  .wchip.cond { opacity:.75; border-style:dashed; }
+  .wchip.on { opacity:1; border-color:var(--accent); background:var(--chip2); color:var(--text); }
+  .chip.extra { border-color:#e0b020; background:rgba(224,176,32,.18); }
+  .chip.root { background:var(--chip2); border-color:var(--accent); }
+  .chip.hidden { border-style:dashed; }
+  .chip.anc { border-color:var(--hl); } .chip.sel { outline:2px solid var(--accent); }
+  .chip.dim { opacity:1; }
+  .chip.nomodel { border-color:#ff9a2e; box-shadow:0 0 0 1px #ff9a2e; }
+  .chip.needrw { border-color:#f08a24; background:rgba(240,138,36,.2); box-shadow:0 0 0 1px #f08a24; }
+  .chip.unmapped { border-color:#e5484d; background:rgba(229,72,77,.18); box-shadow:0 0 0 1px #e5484d; }
+  .legend { display:flex; gap:6px; align-items:center; color:var(--muted); font-size:12px; }
+  .legend i { display:inline-block; width:12px; height:12px; border:1px solid #e5484d; background:rgba(229,72,77,.18); border-radius:3px; }
+  .chip.cond::after { content:''; position:absolute; top:4px; right:4px; width:7px; height:7px; border-radius:50%; background:var(--hl); }
+  .search { position:relative; margin-top:8px; max-width:520px; }
+  .search input { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--text); font:inherit; }
+  #results { position:absolute; z-index:5; left:0; right:0; top:100%; margin-top:2px; max-height:300px; overflow:auto; background:var(--panel); border:1px solid var(--line); border-radius:6px; }
+  #results button { display:flex; justify-content:space-between; gap:10px; width:100%; text-align:left; padding:6px 10px; background:none; border:0; border-bottom:1px solid var(--line); color:var(--text); font:inherit; cursor:pointer; }
+  #results button:hover { background:var(--chip); } #results small { color:var(--muted); }
+  ul.conds { margin:2px 0 0; padding-left:18px; } ul.conds li { margin:2px 0; }
+  aside { flex:0 0 280px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px; position:sticky; top:calc(var(--sn-h,0px) + 8px); }
+  aside h2 { margin:0 0 6px; font-size:16px; } aside dl { margin:0; } aside dt { color:var(--muted); font-size:12px; margin-top:8px; } aside dd { margin:0; }
+  .note { color:var(--muted); font-size:12px; margin-top:10px; }
+  .pill { display:inline-block; padding:1px 7px; margin:1px 2px 1px 0; border:1px solid var(--line); border-radius:999px; font-size:12px; cursor:pointer; background:transparent; color:var(--text); }
+  @media (max-width:800px) { .wrap { flex-direction:column; } aside { flex-basis:auto; width:100%; position:static; } }
+  footer { max-width:1300px; margin:0 auto; padding:0 16px 30px; color:var(--muted); font-size:12px; }
+  a { color:var(--accent); }
+  [hidden] { display:none !important; }
+  #classView { flex:1 1 auto; min-width:0; max-height:72vh; overflow:auto; border:1px solid var(--line); border-radius:8px; background:var(--panel); padding:4px 14px 14px; }
+  #classView h3 { margin:16px 0 4px; font-size:15px; position:sticky; top:0; background:var(--panel); padding:6px 0; border-bottom:1px solid var(--line); }
+  #classView h4 { margin:10px 0 2px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  #classView button.row { display:flex; justify-content:space-between; gap:10px; width:100%; text-align:left; padding:5px 8px; background:none; border:0; border-bottom:1px solid var(--line); color:var(--text); font:inherit; cursor:pointer; }
+  #classView button.row:hover, #classView button.row.sel { background:var(--chip); }
+  #classView small { color:var(--muted); white-space:nowrap; }
+  .rw { margin-top:12px; padding:8px 10px; border:1px dashed var(--line); border-radius:6px; font-size:13px; }
+  .rw .lbl { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:2px; }
+  nav.side hr { width:100%; border:0; border-top:1px solid var(--line); margin:6px 0; }
+  nav.side button.tab.classified { border-style:dashed; letter-spacing:.08em; }
+  a.thumb { display:block; position:relative; margin-top:4px; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:linear-gradient(#5b7fa6,#2c3f58); cursor:pointer; }
+  a.thumb:hover, a.thumb:focus-visible { border-color:var(--accent); }
+  a.thumb canvas { display:block; width:100%; height:150px; }
+  a.thumb span { position:absolute; left:6px; bottom:4px; font-size:11px; color:#e8eef9; text-shadow:0 1px 2px #000; pointer-events:none; }
+  .chip.visreq { outline:2px dashed #ff7a59; outline-offset:2px; }
+  .pill.visreq { border-color:#ff7a59; color:#ff7a59; font-weight:600; }
+  table.st tr.derived td { color:#e6b450; font-style:italic; } @media (prefers-color-scheme:light){ table.st tr.derived td { color:#a35f00; } }
+  table.st.eng { margin-top:2px; } table.st.eng th { font-size:11px; font-weight:600; color:var(--muted); }
+  table.st.eng th, table.st.eng td { text-align:right; padding:2px 3px; } table.st.eng th:first-child, table.st.eng td:first-child { text-align:left; padding-left:0; }
+  table.st {border-collapse:collapse; width:100%; font-size:13px; } table.st td { padding:2px 0; } table.st td:last-child { text-align:right; }
+</style>
+<script src="shell.js" defer></script></head>
+<body>
+<script src="nav.js"></script><script src="rotors.js"></script>
+<header>
+  <h1>Tech Tree</h1>
+ <div class="search"><input id="q" type="search" placeholder="Search every item by name (e.g. destroyer, 12.7cm, radar, A-4P)" aria-label="Search items"><div id="results" role="listbox" hidden></div></div>
+</header>
+<div class="shell">
+  <nav id="cats" class="side" aria-label="Categories"></nav>
+  <div class="main">
+    <div class="topbar">
+      <nav id="groups" class="groups" aria-label="Trees"></nav>
+      <div class="layout" id="layoutToggle" role="group" aria-label="Chip layout"><span>Layout</span>
+        <button type="button" class="tab" id="layStd">Standard</button><button type="button" class="tab" id="layCmp" title="Sub-types (calibers, barrels, nations, ship classes) at half width">Compact</button><button type="button" class="tab" id="layCol" title="Hide the sub-types; show only the major techs">Collapsed</button></div>
+    </div>
+    <div class="wrap">
+      <div id="view"><div id="stage"><svg id="edges"></svg></div></div>
+      <div id="classView" hidden></div>
+      <aside id="info"><h2>Select a chip</h2><p class="note">Click a chip to see its cost, research time and the chips you must develop first. Dashed chips are hidden in-game until they are unlocked.</p></aside>
+    </div>
+  </div>
+</div>
+<footer>Fan project, not affiliated with the publisher.</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(async function () {
+  const COLW = 150, ROWH = 62, PADX = 16, PADY = 14, W = 118, H = 44;
+  let data;
+  try { data = await (await fetch('tree.json', { cache: 'no-cache' })).json(); } catch (e) { document.getElementById('stage').textContent = 'Could not load tree.json (serve this folder over http).'; return; }
+  const catsEl = document.getElementById('cats'), groupsEl = document.getElementById('groups'), stage = document.getElementById('stage'), svg = document.getElementById('edges'), info = document.getElementById('info');
+  let cat = 0, grp = 0, sel = null, current = null, inClass = false, fromNav = false;
+  // Browser history: every category / tree / chip / Classified item you open becomes its own history entry (#GROUP, #GROUP:index, #classified, #cls:Name), so Back and Forward
+  // step through where you were. The same hashes work as links. fromNav is true while the page is following the address bar, so that does not add entries.
+  function pushNav(h) {
+    if (fromNav) return;
+    let cur = ''; try { cur = decodeURIComponent(location.hash.slice(1)); } catch (e) {}
+    if (cur === h) return;
+    try { history.pushState(null, '', '#' + encodeURIComponent(h).replace(/%3A/g, ':')); } catch (e) {}
+  }
+  // optional data: items that are on no tech tree (CLASSIFIED) and curated real-world references
+  let classified = null, realWorld = {};
+  try { classified = await (await fetch('classified.json', { cache: 'no-cache' })).json(); } catch (e) {}
+  // aircraft / hull compatibility matrix per gear type (7 letters, one per hull class: Y yes, L only with a launcher, H only with a heliport, N no).
+  // Left empty in this scaffold; fill it in from your own notes. Unknown gear types default to 'NNNNNNN'.
+  const COMPAT = {};
+  // Thumbnail 3D viewer for aircraft: models/chips.json (tools/model_entities.py) links a tree chip or an aircraft name to its model file.
+  let chipModels = null, modelIndex = null, thumb = null;
+  try { chipModels = await (await fetch('models/chips.json', { cache: 'no-cache' })).json(); } catch (e) {}
+  let funnels = {}; try { funnels = await (await fetch('models/funnels.json', { cache: 'no-cache' })).json(); } catch (e) {}      // Smokestack chip -> its funnel model per nation and class (tools/funnel_models.py)
+  const normName = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const modelFor = (group, chipI, name) => chipModels ? (chipModels.chips[group + ':' + chipI] || chipModels.names[normName(name)] || null) : null;
+  function modelThumb(id, what) {
+    if (!id || !window.THREE) return null;
+    what = what || 'aircraft';
+    const a = document.createElement('a'); a.className = 'thumb'; a.href = 'models.html#' + id; a.title = 'Open this ' + what + ' in the model viewer'; a.setAttribute('aria-label', 'Open this ' + what + ' in the 3D model viewer');
+    const cv = document.createElement('canvas'), cap = document.createElement('span'); cap.textContent = (what === 'hull' ? 'Dock model' : '3D model') + ' · click to open'; a.append(cv, cap);
+    startThumb(cv, id).catch(() => { a.remove(); });
+    return a;
+  }
+  // Gun turrets carry a stack of cylinder rings underneath (the base the game hides on elevated mounts): find the connected pieces of the mesh that are
+  // roughly round, wide, low and short of faces, and leave them out of the picture.
+  const HIDE_BASE = /^w_(ho|ga)_|^w_ki_013|^w_ko_000|^w_gy_|^w_ki_(?:000|004|009|015|018)/, HIDE_TORP = /^w_gy_|^w_ki_(?:000|004|009|015|018)/;   // guns / gatlings: round, wide, low pieces of 8-30 faces; torpedo launchers and machine guns: the stack of small pieces running up from the bottom of the model
+  function baseQuads(m, dv, p, qo) {
+    const skip = new Set(); if (!HIDE_BASE.test(m.name)) return skip;
+    const par = Array.from({ length: p.v }, (_, i) => i), f = x => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+    const Q = []; for (let k = 0; k < p.q; k++) { const q = [0, 1, 2, 3].map(j => dv.getUint16(qo + (k * 4 + j) * 2, true)); Q.push(q); for (let j = 1; j < 4; j++) par[f(q[j])] = f(q[0]); }
+    const V = i => [dv.getFloat32(i * 12, true), dv.getFloat32(i * 12 + 4, true), dv.getFloat32(i * 12 + 8, true)];
+    let top = -1e9; for (let i = 0; i < p.v; i++) top = Math.max(top, V(i)[2]);
+    const comp = new Map(); Q.forEach((q, k) => { const r = f(q[0]); if (!comp.has(r)) comp.set(r, []); comp.get(r).push(k); });
+    const cs = [...comp.values()].map(ks => {
+      const vs = new Set(); ks.forEach(k => Q[k].forEach(i => vs.add(i)));
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, z0 = 1e9, z1 = -1e9; vs.forEach(i => { const v = V(i); x0 = Math.min(x0, v[0]); x1 = Math.max(x1, v[0]); y0 = Math.min(y0, v[1]); y1 = Math.max(y1, v[1]); z0 = Math.min(z0, v[2]); z1 = Math.max(z1, v[2]); });
+      return { ks, dx: x1 - x0, dy: y1 - y0, z0, z1 };
+    });
+    if (HIDE_TORP.test(m.name)) {
+      cs.sort((a, b) => a.z0 - b.z0); let reach = null; const chain = [];
+      for (const c of cs) {
+        if (c.ks.length > 12 || Math.max(c.dx, c.dy) < 80 || c.z1 > 0.75 * top) { if (reach === null) continue; break; }
+        if (reach === null ? c.z0 > 0.1 * top : c.z0 > reach + 3) break;
+        reach = Math.max(reach === null ? -1e9 : reach, c.z1); chain.push(c);
+      }
+      // the ring right under the turret (the top of the chain) stays; the larger rings / block below it are hidden
+      if (chain.length > 1) { const keep = chain.reduce((a, b) => (b.z1 > a.z1 ? b : a)); chain.splice(chain.indexOf(keep), 1); }
+      chain.forEach(c => c.ks.forEach(k => skip.add(k)));
+    } else {
+      const hid = cs.filter(c => c.ks.length >= 8 && c.ks.length <= 30 && c.dx && c.dy && Math.min(c.dx, c.dy) / Math.max(c.dx, c.dy) >= 0.85 && Math.max(c.dx, c.dy) > 150 && c.z1 <= 0.72 * top);
+      hid.forEach(c => c.ks.forEach(k => skip.add(k)));
+      // flat cap plates (a hexagon of 1-2 faces) lying on the edge of a hidden ring and no wider than it would otherwise float in the picture once the rings are gone (High-V guns)
+      for (const c of cs) if (!hid.includes(c) && c.ks.length < 8 && c.z0 === c.z1 && hid.some(h => (Math.abs(h.z0 - c.z0) < 1 || Math.abs(h.z1 - c.z0) < 1) && c.dx <= h.dx + 1 && c.dy <= h.dy + 1)) c.ks.forEach(k => skip.add(k));
+    }
+    return skip;
+  }
+  // Smooth shading for the thumbnails, same as the model viewer's "Smooth" button (models.html smoothNormals): triangles that meet at a point share an averaged normal when their
+  // faces are within 55 degrees of each other, so curved parts look round and hard edges stay hard. The viewer's saved Smooth on / off choice applies here too.
+  function smoothNormals(g) {
+    const P = g.attributes.position.array, nt = P.length / 9, fn = new Float32Array(nt * 3), key = new Array(nt * 3), at = new Map(), cosT = Math.cos(55 * Math.PI / 180);
+    for (let t = 0; t < nt; t++) {
+      const o = t * 9, ux = P[o + 3] - P[o], uy = P[o + 4] - P[o + 1], uz = P[o + 5] - P[o + 2], vx = P[o + 6] - P[o], vy = P[o + 7] - P[o + 1], vz = P[o + 8] - P[o + 2];
+      const x = uy * vz - uz * vy, y = uz * vx - ux * vz, z = ux * vy - uy * vx, l = Math.hypot(x, y, z) || 1; fn[t * 3] = x / l; fn[t * 3 + 1] = y / l; fn[t * 3 + 2] = z / l;
+      for (let c = 0; c < 3; c++) { const k = Math.round(P[o + c * 3] * 4) + ',' + Math.round(P[o + c * 3 + 1] * 4) + ',' + Math.round(P[o + c * 3 + 2] * 4); key[t * 3 + c] = k; (at.get(k) || at.set(k, []).get(k)).push(t); }
+    }
+    const N = new Float32Array(P.length);
+    for (let t = 0; t < nt; t++) for (let c = 0; c < 3; c++) {
+      let x = 0, y = 0, z = 0; const a = fn.subarray(t * 3, t * 3 + 3);
+      for (const u of at.get(key[t * 3 + c])) { const b = fn.subarray(u * 3, u * 3 + 3); if (a[0] * b[0] + a[1] * b[1] + a[2] * b[2] >= cosT) { x += b[0]; y += b[1]; z += b[2]; } }
+      const l = Math.hypot(x, y, z) || 1, o = t * 9 + c * 3; N[o] = x / l; N[o + 1] = y / l; N[o + 2] = z / l;
+    }
+    g.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+  }
+  function sysShort(n) { return ({ 'ammo-assembler': 'Ammo Asmbl', 'ammo assembler': 'Ammo Asmbl', 'fire insurance': 'Fire Ins', 'flood insurance': 'Flood Ins', 'engine warranty': 'Engn Wrnty', 'high gravity shield': 'Hi Grav Shld' })[String(n).toLowerCase()] || null; }      // short chip names for the long "not on tree" system items
+  let thumbSmooth = true; try { thumbSmooth = localStorage.getItem('wg2.models.smooth') !== '0'; } catch (e) {}
+  async function startThumb(cv, id) {
+    if (thumb) { thumb.stop = true; try { thumb.renderer.dispose(); thumb.renderer.forceContextLoss(); } catch (e) {} }
+    const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }), st = thumb = { renderer, stop: false };
+    renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1)); renderer.setSize(254, 150, false);
+    if (!modelIndex) modelIndex = fetch('models/index.json', { cache: 'no-cache' }).then(r => r.json());
+    const m = (await modelIndex).find(x => x.id === id); if (!m) throw new Error('no model');
+    const buf = await (await fetch('models/' + id + '.bin', { cache: 'no-cache' })).arrayBuffer(); if (st.stop) return;
+    // part 0 = full-detail mesh: Float32 xyz per vertex, Uint16 a,b,c,e per quad, Uint16 uv pairs per quad (same layout as models.html)
+    const rd = m.cat === 'aircraft' && window.wg2Rotors ? wg2Rotors(m, buf, id) : null;      // aircraft: the high-poly rotor / propeller blades are separate pieces that spin (rotors.js)
+    const p = m.parts[0], dv = new DataView(buf), qo = p.v * 12, uo = qo + p.q * 8, pos = [], uv = [], skipQ = rd ? new Set() : baseQuads(m, dv, p, qo);
+    for (let k = 0; k < (rd ? 0 : p.q); k++) {
+      if (skipQ.has(k)) continue;
+      const q4 = [0, 1, 2, 3].map(j => dv.getUint16(qo + (k * 4 + j) * 2, true));
+      for (const t of (q4[2] === q4[3] ? [[0, 1, 2]] : [[0, 1, 2], [0, 2, 3]])) for (const c of t) {
+        const vi = q4[c]; pos.push(dv.getFloat32(vi * 12, true), dv.getFloat32(vi * 12 + 4, true), dv.getFloat32(vi * 12 + 8, true));
+        uv.push(dv.getUint16(uo + (k * 8 + c * 2) * 2, true) / 16384, dv.getUint16(uo + (k * 8 + c * 2 + 1) * 2, true) / 16384);
+      }
+    }
+    if (rd) { for (const v of rd.body.pos) pos.push(v); for (const v of rd.body.uv) uv.push(v); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); if (thumbSmooth) smoothNormals(g); else g.computeVertexNormals(); g.computeBoundingBox();
+    const box = g.boundingBox.clone(); if (rd) for (const R of rd.rots) for (let i = 0; i < R.pos.length; i += 3) box.expandByPoint(new THREE.Vector3(R.pos[i], R.pos[i + 1], R.pos[i + 2]));      // the framing includes the rotors
+    const ctr = new THREE.Vector3(); box.getCenter(ctr); g.translate(-ctr.x, -ctr.y, -ctr.z); const bs = new THREE.Sphere(); box.getBoundingSphere(bs); const r = bs.radius;
+    const tex = m.tex != null ? new THREE.TextureLoader().load('models/' + id + '.png') : null; if (tex) { tex.flipY = false; tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.encoding = THREE.sRGBEncoding; }
+    const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: tex ? 0xffffff : 0x8fb4d8, map: tex, metalness: 0.05, roughness: 0.8, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1, transparent: !!tex, alphaTest: tex ? 0.4 : 0 }));
+    const rotMeshes = [];
+    if (rd) for (const R of rd.rots) {      // each rotor: its geometry about its own hub, placed at the hub; turned about its axis every frame
+      const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(R.pos, 3)); rg.setAttribute('uv', new THREE.Float32BufferAttribute(R.uv, 2)); if (thumbSmooth) smoothNormals(rg); else rg.computeVertexNormals(); rg.translate(-R.c[0], -R.c[1], -R.c[2]);
+      const rm = new THREE.Mesh(rg, mesh.material); rm.position.set(R.c[0] - ctr.x, R.c[1] - ctr.y, R.c[2] - ctr.z); mesh.add(rm);
+      rotMeshes.push({ rm, axis: R.n ? new THREE.Vector3(R.n[0], R.n[1], R.n[2]) : new THREE.Vector3(R.axis === 'x' ? 1 : 0, R.axis === 'y' ? 1 : 0, R.axis === 'z' ? 1 : 0), g: rg });
+    }
+    mesh.rotation.x = -Math.PI / 2;                       // model data is z-up
+    const spin = new THREE.Group(); spin.add(mesh); const scene = new THREE.Scene(); scene.add(spin);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x667788, 1.6)); const dl = new THREE.DirectionalLight(0xffffff, 1.0); dl.position.set(1, 2, 1.5); scene.add(dl);
+    const dist = r * Math.hypot(0.8, 2.0), cam = new THREE.PerspectiveCamera(35, 254 / 150, dist - r * 1.05, dist + r * 1.05); cam.position.set(0, r * 0.8, r * 2.0); cam.lookAt(0, 0, 0);      // near / far hug the bounding sphere for depth precision
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches; spin.rotation.y = 0.7; let t0 = null;
+    (function frame(t) {
+      if (!still) rotMeshes.forEach((o, i) => o.rm.quaternion.setFromAxisAngle(o.axis, (t || 0) * 0.015 * (i % 2 ? -1 : 1)));      // rotors spin (alternate ones the other way)
+      if (st.stop || !cv.isConnected) { rotMeshes.forEach(o => o.g.dispose()); g.dispose(); if (tex) tex.dispose(); try { renderer.dispose(); renderer.forceContextLoss(); } catch (e) {} if (thumb === st) thumb = null; return; }
+      if (!still && t0 !== null) spin.rotation.y -= (t - t0) * 0.0005; t0 = t;
+      renderer.render(scene, cam); requestAnimationFrame(frame);
+    })(null);
+  }
+  function gearChips(gear, mid) {
+    const w = document.createElement('div');
+    const row = (labels, on) => { const d = document.createElement('div'); d.className = 'wchips'; d.style.marginTop = '4px'; labels.forEach((k, n) => { const f = on(k, n), s = document.createElement('span'); s.className = 'wchip' + (f ? ' on' : '') + (f === 'cond' ? ' cond' : ''); s.textContent = k; d.appendChild(s); }); return d; };
+    w.appendChild(row(['GEAR', 'SEA', 'VTOL', 'HELI', 'UFO'], k => k === gear));
+    if (mid) w.appendChild(mid);                          // thumbnail viewer sits between the gear row and the ship row
+    const m = COMPAT[gear] || 'NNNNNNN';
+    w.appendChild(row(['DD', 'CA', 'BB', 'CV', 'BC', 'FF', 'SS'], (k, n) => m[n] === 'Y' ? true : (m[n] === 'N' ? false : 'cond')));
+    return w;
+  }
+  // "how it is found": missions (grouped) that award or drop the item, each linking to the campaign page
+  function missionList(ms) {
+    const by = new Map();
+    for (const m of ms) { const k = m.mission + '|' + m.deployment; const e = by.get(k) || { m, hows: [] }; if (!e.hows.includes(m.how)) e.hows.push(m.how); by.set(k, e); }
+    const ul = document.createElement('ul'); ul.className = 'conds';
+    for (const { m, hows } of by.values()) {
+      const li = document.createElement('li'); const a = document.createElement('a'); a.href = 'campaign.html#' + m.mission; a.textContent = m.mission;
+      li.append(a, ' (L' + m.deployment + '): ' + hows.join(', ') + (m.hard ? ', Hard or higher' : '')); ul.appendChild(li);
+    }
+    return ul;
+  }
+  // U.K. Destroyer VI exists only as a pickup; show it where the nation chips of Destroyer VI would continue (Jpn, U.S., U.K., Ger)
+  if (classified) {
+    const uk = classified.sections.flatMap(s => s.items).find(i => i.name === 'U.K. Destroyer 6');
+    const g = data.categories.flatMap(c => c.groups).find(g => g.name === 'HULLS'), base = g && g.chips.find(c => c.full === 'Destroyer VI');
+    if (uk && base) g.chips.push({ i: 9001, label: 'U.K.', x: base.x + 1, y: base.y + 2, cost: null, turns: null, hidden: false, kind: 1, prereq: [base.i], anc: [base.i, ...base.anc], conds: [], item: null, full: 'U.K. Destroyer VI', stats: null, sub: true, extra: true, missions: uk.missions || [] });
+  }
+  // items the game never places on a tree (aircraft, systems, ...) get their own yellow, unconnected chips in a row below the tree
+  if (classified) {
+    for (const s of classified.sections) for (const it of s.items) {
+      if (it.kind !== 'Not on any tech tree' || !it.chip) continue;
+      for (const cat of data.categories) for (const g of cat.groups) {
+        if (g.name !== it.group) continue;
+        const placed = g.chips.filter(c => c.y !== null && !c.extra), maxY = Math.max(...placed.map(c => c.y)), n = g.chips.filter(c => c.extra).length;      // (the real tree's last row; the "not on tree" chips then follow one row apart: counting the earlier extras too spread them further and further down)
+        g.chips.push({ i: it.chip, label: sysShort(it.name) || it.label || it.name, x: 0, y: maxY + 2 + n, cost: null, turns: null, hidden: false, kind: 1, prereq: [], anc: [], conds: [], item: null, full: it.name, stats: it.stats || null, sub: false, extra: true, missions: it.missions || [], sys: it.sys || null });
+      }
+    }
+  }
+  // guide-only systems (High Gravity Shield, Ammo-Assembler): yellow "not on tree" chips in the tree the systems guide lists them under
+  if (classified) {
+    for (const it of classified.sections.flatMap(s => s.items)) {
+      if (!(it.kind.startsWith('Award, only one exists') || it.kind === 'Not on any tech tree (ship guide)') || !it.group) continue;
+      for (const cat of data.categories) for (const g of cat.groups) {
+        if (g.name !== it.group || g.chips.some(c => c.full === it.name)) continue;
+        const placed = g.chips.filter(c => c.y !== null && !c.extra), maxY = Math.max(...placed.map(c => c.y)), n = g.chips.filter(c => c.extra).length, id = 9100 + g.chips.length;
+        it.idx = id;      // lets the CLASSIFIED panel offer "Open on the tree"
+        if (it.model && chipModels) chipModels.chips[g.name + ':' + id] = it.model;      // hand-linked 3D model (searchlight)
+        g.chips.push({ i: id, label: sysShort(it.name) || it.name, x: 0, y: maxY + 2 + n, cost: null, turns: null, hidden: false, kind: 1, prereq: [], anc: [], conds: [], item: null, full: it.name, stats: null, sub: false, extra: true, missions: it.missions || [], found_in: it.found_in || [], sys: it.sys || null });
+      }
+    }
+  }
+  // system text from the systems guide (description, effect, weight, notes), shown in the detail panel
+  function sysRows(row, s) {
+    if (!s) return;
+    row('Description', s.desc);
+    if (s.effect) row('Effect', s.effect);
+    if (s.weight != null) row('Weight', s.weight + ' t');
+    if (s.notes) row('Notes', s.notes);
+  }
+  try { realWorld = await (await fetch('real_world.json', { cache: 'no-cache' })).json(); } catch (e) {}
+  // secret blueprint -> the hull the game selects for it (tools/blueprint_designs.py). Several blueprints can share one hull.
+  let bpHulls = {};       // hull name -> { chip: 'HULLS:i' | null, blueprints: [{ name, nation, ship_type, wiki, url }] }
+  try { bpHulls = await (await fetch('blueprint_hulls.json', { cache: 'no-cache' })).json(); } catch (e) {}
+  let bridgeModels = {};      // 'BRIDGE:i' / 'AFT:i' -> { model: 'j_dd_kaa_03', id: 'mdt_weph_222' } (tools/part_table.py)
+  try { bridgeModels = await (await fetch('bridge_models.json', { cache: 'no-cache' })).json(); } catch (e) {}
+  if (chipModels) for (const [k, v] of Object.entries(bridgeModels)) if (!chipModels.chips[k]) chipModels.chips[k] = v.id;    // bridges get the same 3D thumbnail and "model linked" status as other weapon / structure chips
+  const hullOfChip = {}, hullOfBp = {}, chipUsers = {};       // chipUsers: 'GROUP:i' -> the secret blueprints whose design uses that part
+  for (const [h, v] of Object.entries(bpHulls)) {
+    if (v.chip) hullOfChip[v.chip] = h;
+    for (const b of v.blueprints) {
+      hullOfBp[b.name + '|' + b.nation + '|' + b.ship_type] = { hull: h, chip: v.chip, parts: b.parts || [], engines: b.engines || 0 };
+      for (const p of b.parts || []) if (p.chip) { const l = chipUsers[p.chip] = chipUsers[p.chip] || []; if (!l.some(x => x.b === b)) l.push({ b, p }); }
+    }
+  }
+  let chipNames = null;
+  const chipLabel = key => {
+    if (!chipNames) { chipNames = {}; data.categories.forEach(c => c.groups.forEach(g => g.chips.forEach(ch => { if (ch.i > 0) chipNames[g.name + ':' + ch.i] = ch.full || ch.label; }))); }
+    return chipNames[key] || key;
+  };
+  const partText = p => p.count + ' × ' + (p.barrels ? ({ 1: 'single ', 2: 'twin ', 3: 'triple ', 4: 'quad ' }[p.barrels] || p.barrels + '-barrel ') : '') + p.label;
+  let wstats = {};
+  try { wstats = await (await fetch('weapon_stats.json', { cache: 'no-cache' })).json(); } catch (e) {}
+  const classView = document.getElementById('classView'), viewEl = document.getElementById('view');
+
+  function tab(label, selected, extra, onclick) {
+    const b = document.createElement('button'); b.className = 'tab'; b.type = 'button'; b.setAttribute('aria-selected', selected);
+    b.textContent = label; if (extra) { const s = document.createElement('span'); s.className = 'count'; s.textContent = extra; b.appendChild(s); }
+    b.onclick = onclick; return b;
+  }
+  const real = g => g.chips.filter(c => c.i > 0).length;
+  function renderTabs() {
+    const tabs = data.categories.map((c, i) => tab(c.name, !inClass && i === cat, c.groups.reduce((n, g) => n + real(g), 0), () => { inClass = false; cat = i; grp = 0; sel = null; renderTabs(); renderTree(); pushNav(data.categories[cat].groups[grp].name); }));
+    if (classified) {
+      const hr = document.createElement('hr'); tabs.push(hr);
+      const n = classified.sections.reduce((a, s) => a + s.items.length, 0);
+      const t = tab('CLASSIFIED', inClass, n, () => { inClass = true; renderTabs(); renderClassified(); pushNav('classified'); }); t.classList.add('classified'); tabs.push(t);
+    }
+    catsEl.replaceChildren(...tabs);
+    const gs = data.categories[cat].groups;
+    groupsEl.replaceChildren(...gs.map((g, i) => tab(g.name, i === grp, real(g), () => { grp = i; sel = null; renderTabs(); renderTree(); pushNav(g.name); })));
+    groupsEl.hidden = inClass;
+    viewEl.hidden = inClass; classView.hidden = !inClass;
+    document.getElementById('layoutToggle').hidden = inClass;
+    ['Std', 'Cmp', 'Col'].forEach((k, n) => document.getElementById('lay' + k).setAttribute('aria-selected', mode === ['standard', 'compact', 'collapsed'][n]));
+  }
+  // "Real-world reference" panel: curated entries from real_world.json if present, otherwise a search link and a note on how to add one
+  function realWorldPanel(key, term, extra) {
+    const e = realWorld[key];
+    if (!e) return null;                      // nothing found: show no panel at all
+    const box = document.createElement('div'); box.className = 'rw';
+    const l = document.createElement('div'); l.className = 'lbl'; l.textContent = 'Real-world reference'; box.appendChild(l);
+    if (extra) { const p = document.createElement('div'); p.textContent = extra; box.appendChild(p); }
+    if (e) {
+      const p = document.createElement('div'); p.style.fontWeight = '600';
+      if (e.url) { const a = document.createElement('a'); a.href = e.url; a.textContent = e.name; a.target = '_blank'; a.rel = 'noopener'; p.appendChild(a); } else p.textContent = e.name;
+      box.appendChild(p);
+      const m = document.createElement('div'); m.textContent = [e.maker, e.nation, e.years].filter(Boolean).join(' · '); box.appendChild(m);
+      if (e.also && e.also.length) {          // guns of the same bore in other navies (tools/real_world_ships_weapons.py ALSO)
+        const h = document.createElement('div'); h.className = 'lbl'; h.style.marginTop = '8px'; h.textContent = e.also_label || 'Same caliber in other navies'; box.appendChild(h);
+        for (const o of e.also) { const p = document.createElement('div'); const a = document.createElement('a'); a.href = o.url; a.textContent = o.name; a.target = '_blank'; a.rel = 'noopener'; p.append(a, ' · ' + o.nation); box.appendChild(p); }
+      }
+      // no labels or notes in the panel (review notes live in REAL_WORLD_REVIEW.md)
+      if (false) { const q = document.createElement('div'); q.className = 'note'; q.textContent = e.note; box.appendChild(q); }
+    }
+    return box;
+  }
+  // hull chips: the secret blueprints whose design the game builds on this hull, each linked to the real class's Wikipedia page
+  function hullBlueprintPanel(hullName) {
+    const v = bpHulls[hullName]; if (!v) return null;
+    const box = document.createElement('div'); box.className = 'rw';
+    const l = document.createElement('div'); l.className = 'lbl'; l.textContent = v.blueprints.length > 1 ? 'Real-world classes (secret blueprints on this hull)' : 'Real-world class (secret blueprint on this hull)'; box.appendChild(l);
+    for (const b of v.blueprints) {
+      const p = document.createElement('div'); p.style.fontWeight = '600';
+      if (b.url) { const a = document.createElement('a'); a.href = b.url; a.textContent = b.wiki; a.target = '_blank'; a.rel = 'noopener'; p.appendChild(a); } else p.textContent = b.name + ' (no Wikipedia page)';
+      box.appendChild(p);
+      const m = document.createElement('div'); m.textContent = 'Blueprint: ' + b.name; box.appendChild(m);
+    }
+    return box;
+  }
+  function renderClassified() {
+    classView.replaceChildren();
+    for (const s0 of classified.sections) {
+      const s = { title: s0.title, items: s0.items.filter(i => i.kind !== 'On the tree once recovered') };   // those appear on their tree once recovered
+      if (!s.items.length) continue;
+      const h = document.createElement('h3'); h.textContent = s.title + ' (' + s.items.length + ')'; classView.appendChild(h);
+      let lastSub = null;
+      const items = s.items.slice().sort((a, b) => (a.kind.localeCompare(b.kind)) || ((a.nation || '').localeCompare(b.nation || '')) || 0);
+      const kinds = [...new Set(s.items.map(i => i.kind))].sort((a, b) => (a.startsWith('Secret') ? 1 : 0) - (b.startsWith('Secret') ? 1 : 0) || a.localeCompare(b));
+      for (const kind of kinds) {
+        const group = s.items.filter(i => i.kind === kind);
+        const sub = document.createElement('h4'); sub.textContent = kind + ' (' + group.length + ')'; classView.appendChild(sub);
+        if (kind.startsWith('Secret')) {
+          const natOrder = ['United Kingdom', 'Germany', 'Japan', 'United States'], tyOrder = ['Battleship', 'Battlecarrier', 'Cruiser', 'Carrier', 'Destroyer'];
+          group.sort((a, b) => natOrder.indexOf(a.nation) - natOrder.indexOf(b.nation) || tyOrder.indexOf(a.ship_type) - tyOrder.indexOf(b.ship_type));
+        }
+        const mkChip = it => {
+          const b = document.createElement('button'); b.type = 'button'; b.className = 'cchip';
+          const a = document.createElement('div'); a.className = 'l'; a.textContent = it.name; a.title = it.name;
+          b.appendChild(a);
+          if (!kind.startsWith('Secret')) { const m = document.createElement('div'); m.className = 'c'; m.textContent = it.nation ? it.nation + ' · ' + (it.ship_type || '') : (it.group || ''); b.appendChild(m); }
+          b.onclick = () => { classView.querySelectorAll('.cchip.sel').forEach(n => n.classList.remove('sel')); b.classList.add('sel'); showClassInfo(it); };
+          return b;
+        };
+        if (kind.startsWith('Secret')) {       // secret blueprint ships: columns are nations, rows are ship classes
+          const nats = ['United Kingdom', 'Germany', 'Japan', 'United States'], tys = ['Battleship', 'Battlecarrier', 'Cruiser', 'Carrier', 'Destroyer'];
+          const grid = document.createElement('div'); grid.className = 'bpgrid'; classView.appendChild(grid);
+          grid.appendChild(document.createElement('div'));
+          nats.forEach(n => { const d = document.createElement('div'); d.className = 'bph'; d.textContent = n; grid.appendChild(d); });
+          tys.forEach(ty => {
+            const r = document.createElement('div'); r.className = 'bph'; r.textContent = ty; grid.appendChild(r);
+            nats.forEach(n => { const cell = document.createElement('div'); cell.className = 'bpcell'; group.filter(i => i.nation === n && i.ship_type === ty).forEach(i => cell.appendChild(mkChip(i))); grid.appendChild(cell); });
+          });
+          continue;
+        }
+        const fan = document.createElement('div'); fan.className = 'fan'; classView.appendChild(fan);
+        for (const it of group) {
+          const b = document.createElement('button'); b.type = 'button'; b.className = 'cchip';
+          const a = document.createElement('div'); a.className = 'l'; a.textContent = it.name; a.title = it.name; const m = document.createElement('div'); m.className = 'c'; m.textContent = it.nation ? it.nation + ' · ' + (it.ship_type || '') : (it.group || '');
+          b.append(a, m); b.onclick = () => { classView.querySelectorAll('.cchip.sel').forEach(n => n.classList.remove('sel')); b.classList.add('sel'); showClassInfo(it); }; fan.appendChild(b);
+        }
+      }
+    }
+    info.innerHTML = '<h2>CLASSIFIED</h2>';
+  }
+  function showClassInfo(it) {
+    pushNav('cls:' + it.name);
+    info.replaceChildren();
+    const h = document.createElement('h2'); h.textContent = it.name; info.appendChild(h);
+    const dl = document.createElement('dl');
+    function row(t, content) { const dt = document.createElement('dt'); dt.textContent = t; const dd = document.createElement('dd'); if (typeof content === 'string') dd.textContent = content; else dd.appendChild(content); dl.append(dt, dd); }
+    row('Kind', it.kind);
+    if (it.nation) row('Nation', it.nation);
+    if (it.ship_type) row('Ship type', it.ship_type);
+    sysRows(row, it.sys);
+    if (it.stats && it.stats.kind === 'aircraft') {
+      const s = it.stats, t = document.createElement('table'); t.className = 'st';
+      const add = (a, b) => { const tr = document.createElement('tr'); const x = document.createElement('td'); x.textContent = a; const y = document.createElement('td'); y.textContent = b; tr.append(x, y); t.appendChild(tr); };
+      { const d = document.createElement('div'); d.style.margin = '6px 0'; d.appendChild(gearChips(s.gear, modelThumb(modelFor(it.group, it.chip, it.name)))); dl.appendChild(d); }
+      add('Speed', s.speed); add('Range', s.range); add('Endurance', s.endurance);
+      add('Night missions', s.night ? 'Yes' : 'No'); add('Heavy weather', s.heavy_weather ? 'Yes' : 'No');
+      s.weapons.forEach((w, k) => add('Weapon ' + (k + 1), w.name + ' ×' + w.rounds));
+      row('Aircraft stats', t);
+    }
+    const ws = it.chip && wstats['chip:' + it.group + ':' + it.chip];
+    if (ws) {
+      const t = document.createElement('table'); t.className = 'st';
+      [['Damage', ws.dam], ['Reload', ws.rld], ['Rounds', ws.rnds], ['Dispersion', ws.dis], ['Range', ws.rng], ['Weight', ws.wt]].forEach(([a, b]) => { const tr = document.createElement('tr'); const x = document.createElement('td'); x.textContent = a; const y = document.createElement('td'); y.textContent = b; tr.append(x, y); t.appendChild(tr); });
+      const cr = (labels, flags) => { const d = document.createElement('div'); d.className = 'wchips'; labels.forEach(([ch, n]) => { const s = document.createElement('span'); s.className = 'wchip' + (flags.includes(ch) ? ' on' : ''); s.textContent = n; d.appendChild(s); }); return d; };
+      row('Weapon stats', t);
+      row('Targets', cr([['S', 'SFC'], ['A', 'AIR'], ['U', 'SUB'], ['a', 'AUTO'], ['u', 'UWW']], ws.att));
+      row('Ship classes', cr([['d', 'DD'], ['c', 'CA'], ['B', 'BB'], ['V', 'CV'], ['C', 'BC'], ['f', 'FF'], ['s', 'SS']], ws.mount));
+    }
+    if (it.missions) row('How it is found', it.missions.length ? missionList(it.missions) : 'Not listed in the mission guide');
+    if (it.found_in && it.found_in.length) { const ul = document.createElement('ul'); ul.className = 'conds'; it.found_in.forEach(f => { const li = document.createElement('li'); li.textContent = f; ul.appendChild(li); }); row('Where the guide says to find it', ul); }
+    else if (it.kind.startsWith('Secret')) row('Where to find it', 'Not recorded in the guide.');
+    if (it.group && it.idx) { const b = document.createElement('button'); b.className = 'pill'; b.textContent = 'Open on the tree'; b.onclick = () => { inClass = false; goto(it.group, it.idx); }; row('Tech tree', b); }
+    const bh = it.kind.startsWith('Secret') && hullOfBp[it.name + '|' + it.nation + '|' + it.ship_type];
+    if (bh) {
+      if (bh.chip) { const [g0, i0] = bh.chip.split(':'); const b = document.createElement('button'); b.className = 'pill'; b.textContent = bh.hull; b.onclick = () => { inClass = false; goto(g0, +i0); }; row('Selected hull', b); }
+      else row('Selected hull', bh.hull + ' (a pickup-only hull, not on the tree)');
+      // the parts the game fills in for this blueprint, each linked to its tech tree chip (tools/part_table.py)
+      const ul = document.createElement('ul'); ul.className = 'conds';
+      for (const p of bh.parts) {
+        const li = document.createElement('li'); li.append(partText(p));
+        if (p.chip) { const [g0, i0] = p.chip.split(':'); const b = document.createElement('button'); b.className = 'pill'; b.textContent = chipLabel(p.chip); b.title = 'Open on the tech tree'; b.onclick = () => { inClass = false; goto(g0, +i0); }; li.append(' '); li.appendChild(b); }
+        ul.appendChild(li);
+      }
+      if (bh.engines) { const li = document.createElement('li'); li.textContent = bh.engines + ' × engine parts (boilers, turbines: generic, not modelled)'; ul.appendChild(li); }
+      row('Parts', ul);
+    }
+    info.appendChild(dl);
+    const rwp = realWorldPanel(it.chip ? 'chip:' + it.group + ':' + it.chip : 'cls:' + it.name, it.name, ''); if (rwp) info.appendChild(rwp);
+  }
+  // Layout modes. standard: every chip is full width. compact: sub-type chips (caliber and barrel chips, nations, ship classes: c.sub) are half width and
+  // each column is as wide as its widest chip. collapsed: sub-type chips are hidden and the rows and columns they leave empty close up, so only the major
+  // techs remain.
+  let mode = 'standard';
+  try { const m = localStorage.getItem('wg2.layout'); if (m === 'compact' || m === 'collapsed') mode = m; } catch (e) {}
+  const wOf = c => ((mode === 'compact' && c.sub) || (mode === 'collapsed' && c.i !== 0)) ? Math.round(W / 2) : W;   // collapsed: every chip but the root is half width and shows only its label
+  // aircraft (other than the rubber-duck specials) that have no real-world match yet are outlined in red so they can be found and checked in-game
+  // hull chips with no real-world Wikipedia entry (no direct entry and no secret blueprint with a Wikipedia page on them): orange, more research needed.
+  // Class headers that only group the nation chips below them (Destroyer I, ...) are not ships and are left alone.
+  const MARK_MISSING_HULL_RW = false;       // switched off: many hulls are fictional or only share a real ship's guns, so "no Wikipedia entry" is not a gap. Set to true to show the orange marking again.
+  const needsHullRW = (g, c) => {
+    if (!MARK_MISSING_HULL_RW || g.name !== 'HULLS' || c.i <= 0 || realWorld['chip:HULLS:' + c.i]) return false;
+    if (g.chips.some(k => k.sub && k.prereq && k.prereq.includes(c.i))) return false;
+    const h = hullOfChip['HULLS:' + c.i], v = h && bpHulls[h];
+    return !(v && v.blueprints.some(b => b.url));
+  };
+  const unmapped = (g, c) => c.i > 0 && g.chips && data.categories[cat].name === 'AIRCRAFT' && g.name !== 'SPECIAL' && !realWorld['chip:' + g.name + ':' + c.i];
+  // weapon and structure chips with no model linked yet (data/weapon_models.json) are outlined in orange
+  // the general level chips of the bridge trees ("DD FWD Bridge I", no nation) stand for a whole row of nation chips and have no model of their own, so they are not flagged
+  const generalBridge = (g, c) => (g.name === 'BRIDGE' || g.name === 'AFT') && !/^(Jpn|U\.S\.|U\.K\.|Ger|E-tech) /.test(c.full || c.label);
+  const nomodel = (g, c) => c.i > 0 && !c.extra && chipModels && ['ARTILLERY', 'LAUNCHERS', 'HIGH TECH', 'STRUCTURES'].includes(data.categories[cat].name) && g.name !== 'AMMO' && !generalBridge(g, c) && !chipModels.chips[g.name + ':' + c.i] && !(chipModels.none || []).includes(g.name + ':' + c.i);
+  let colX = [];
+  function layoutColumns(nodes) {
+    const maxX = Math.max(...nodes.map(c => c.X)), widths = new Array(maxX + 1).fill(0);
+    for (const c of nodes) widths[c.X] = Math.max(widths[c.X], wOf(c));
+    colX = []; colWd = widths; let x = PADX;
+    for (let k = 0; k <= maxX; k++) { colX[k] = x; x += (widths[k] || W) + (COLW - W); }
+    return x - (COLW - W) + PADX;
+  }
+  let colWd = [];
+  // collapsed: half-width chips are centred in their column so they line up under the full-width root chip
+  const pos = c => ({ x: colX[c.X] + (mode === 'collapsed' ? Math.round(((colWd[c.X] || W) - wOf(c)) / 2) : 0), y: PADY + c.Y * ROWH });
+  function renderTree() {
+    const g = data.categories[cat].groups[grp]; current = g;
+    const allBy = new Map(g.chips.map(c => [c.i, c]));
+    const shown = g.chips.filter(c => c.x !== null && !(mode === 'collapsed' && c.sub));
+    const xs = [...new Set(shown.map(c => c.x))].sort((a, b) => a - b), ys = [...new Set(shown.map(c => c.y))].sort((a, b) => a - b);
+    const xi = new Map(xs.map((v, k) => [v, k])), yi = new Map(ys.map((v, k) => [v, k]));
+    const placed = shown.map(c => Object.assign({}, c, { X: mode === 'collapsed' ? xi.get(c.x) : c.x, Y: mode === 'collapsed' ? yi.get(c.y) : c.y }));
+    const byI = new Map(placed.map(c => [c.i, c]));
+    // when a prerequisite is hidden, connect to its nearest visible ancestors instead
+    const upstream = (i, seen) => { const c = allBy.get(i); if (!c) return []; if (byI.has(i)) return [i]; let out = []; for (const p of c.prereq) if (!seen.has(p)) { seen.add(p); out = out.concat(upstream(p, seen)); } return out; };
+    for (const c of placed) c.vp = [...new Set(c.prereq.flatMap(p => upstream(p, new Set())))];
+    const maxY = Math.max(...placed.map(c => c.Y));
+    const w = layoutColumns(placed), h = PADY * 2 + maxY * ROWH + H;
+    stage.style.width = w + 'px'; stage.style.height = h + 'px'; svg.setAttribute('width', w); svg.setAttribute('height', h);
+    stage.querySelectorAll('.chip').forEach(n => n.remove()); svg.replaceChildren();
+    for (const c of placed) {
+      const p = pos(c), b = document.createElement('button'); b.type = 'button';
+      b.className = 'chip' + (c.i === 0 ? ' root' : '') + (c.hidden ? ' hidden' : '') + (c.extra ? ' extra' : '') + (c.conds && c.conds.length ? ' cond' : '') + (unmapped(g, c) ? ' unmapped' : '') + (needsHullRW(g, c) ? ' needrw' : '') +(nomodel(g, c) ? ' nomodel' : ''); b.style.left = p.x + 'px'; b.style.top = p.y + 'px'; b.style.width = wOf(c) + 'px'; b.dataset.i = c.i;
+      const l = document.createElement('div'); l.className = 'l'; l.textContent = c.label; l.title = c.label; b.appendChild(l);
+      if (mode === 'collapsed' && c.i !== 0) { b.style.display = 'flex'; b.style.alignItems = 'center'; b.style.justifyContent = 'center'; l.style.minWidth = '0'; }   // label only, centred
+      else { const s = document.createElement('div'); s.className = 'c'; s.textContent = c.i === 0 ? g.name + ' · ' + (g.chips.filter(k => !k.extra).length - 1) : (c.extra ? 'Not on tree' : c.cost + ' : ' + c.turns); b.appendChild(s); }
+      b.onclick = () => select(c.i); stage.appendChild(b);
+    }
+    // routing rules inferred from the game's own drawings: straight lines in the same row/column; otherwise, if the parent already has a
+    // child to its right in its own row the new branch hangs off that horizontal line (bus beside the parent); if not, it leaves the
+    // parent's bottom, runs along a bus just below the parent's row and drops into the child's top.
+    const kids = new Map();
+    for (const c of placed) for (const pi of c.vp) { if (!kids.has(pi)) kids.set(pi, []); kids.get(pi).push(c); }
+    const hasRowChild = a => (kids.get(a.i) || []).some(k => k.Y === a.Y && k.X > a.X);
+    // A line must never run across a chip that is not one of its two ends (it would look as if it belonged to that chip's row). Every candidate
+    // route is tested against all chip rectangles and the first clean one is used.
+    const rects = placed.map(c => { const p = pos(c); return { i: c.i, x1: p.x, y1: p.y, x2: p.x + wOf(c), y2: p.y + H }; });
+    const clearSeg = (p, q, ia, ic) => {
+      const lx = Math.min(p[0], q[0]), hx = Math.max(p[0], q[0]), ly = Math.min(p[1], q[1]), hy = Math.max(p[1], q[1]);
+      return !rects.some(r => r.i !== ia && r.i !== ic && hx > r.x1 + 1 && lx < r.x2 - 1 && hy > r.y1 + 1 && ly < r.y2 - 1);
+    };
+    const clearPts = (pts, ia, ic) => pts.every((p, k) => k === 0 || clearSeg(pts[k - 1], p, ia, ic));
+    const toD = pts => pts.map((p, k) => (k ? 'L' : 'M') + p[0] + ',' + p[1]).join(' ');
+    const stats = { total: 0, blocked: 0, oldBlocked: 0, blockedEdges: [] };
+    for (const c of placed) for (const pi of c.vp) {
+      const a = byI.get(pi); if (!a) continue;
+      const pa = pos(a), pc = pos(c), path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      const wa = wOf(a), wc = wOf(c), G = COLW - W;
+      let pts, oldPts;
+      const horizFirst = () => { const bus = pa.x + wa + G / 2; return [[pa.x + wa, pa.y + H / 2], [bus, pa.y + H / 2], [bus, pc.y + H / 2], [c.X > a.X ? pc.x : pc.x + wc, pc.y + H / 2]]; };
+      const vertFirst = () => { const busY = pa.y + H + (ROWH - H) / 2; return [[pa.x + wa / 2, pa.y + H], [pa.x + wa / 2, busY], [pc.x + wc / 2, busY], [pc.x + wc / 2, pc.y]]; };
+      const horizNearChild = () => { const bus = c.X > a.X ? pc.x - G / 2 : pc.x + wc + G / 2; return [[c.X > a.X ? pa.x + wa : pa.x, pa.y + H / 2], [bus, pa.y + H / 2], [bus, pc.y + H / 2], [c.X > a.X ? pc.x : pc.x + wc, pc.y + H / 2]]; };
+      if (a.Y === c.Y) pts = c.X > a.X ? [[pa.x + wa, pa.y + H / 2], [pc.x, pa.y + H / 2]] : [[pa.x, pa.y + H / 2], [pc.x + wc, pa.y + H / 2]];
+      else if (a.X === c.X) pts = c.Y > a.Y ? [[pa.x + wa / 2, pa.y + H], [pa.x + wa / 2, pc.y]] : [[pa.x + wa / 2, pa.y], [pa.x + wa / 2, pc.y + H]];
+      else {
+        const preferred = (c.Y > a.Y && !hasRowChild(a)) ? [vertFirst, horizFirst, horizNearChild] : [horizFirst, vertFirst, horizNearChild];
+        oldPts = preferred[0]();
+        pts = null;
+        for (const f of preferred) { const t = f(); if (clearPts(t, a.i, c.i)) { pts = t; break; } }
+        if (!pts) pts = oldPts;
+      }
+      stats.total++;
+      if (!clearPts(pts, a.i, c.i)) { stats.blocked++; stats.blockedEdges.push(a.label + ' > ' + c.label); }
+      if (oldPts && !clearPts(oldPts, a.i, c.i)) stats.oldBlocked++;
+      path.setAttribute('d', toD(pts)); path.setAttribute('class', 'edge'); path.dataset.from = pi; path.dataset.to = c.i; svg.appendChild(path);
+    }
+    window.__edgeStats = stats;
+    showInfo(null); document.getElementById('view').scrollTo(0, 0);
+  }
+  function select(i) { sel = i; showInfo(i); if (i !== null && current) pushNav(current.name + ':' + i); }
+  function goto(gname, i) {
+    inClass = false;
+    data.categories.forEach((cc, ci) => cc.groups.forEach((gg, gi) => { if (gg.name === gname) { cat = ci; grp = gi; } }));
+    const tg = data.categories[cat].groups[grp].chips.find(c => c.i === i);
+    if (mode === 'collapsed' && tg && tg.sub) { mode = 'standard'; try { localStorage.setItem('wg2.layout', mode); } catch (e) {} }   // the target is a hidden sub-type
+    renderTabs(); renderTree(); select(i);
+    const n = stage.querySelector('.chip[data-i="' + i + '"]');
+    if (n) document.getElementById('view').scrollTo(Math.max(0, n.offsetLeft - 80), Math.max(0, n.offsetTop - 80));
+  }
+  function showInfo(i) {
+    const g = current, byI = new Map(g.chips.map(c => [c.i, c]));
+    const anc = i === null ? new Set() : new Set(byI.get(i).anc);
+    stage.querySelectorAll('.chip').forEach(n => { const k = +n.dataset.i; n.classList.toggle('sel', k === i); n.classList.toggle('anc', anc.has(k)); n.classList.toggle('dim', i !== null && k !== i && !anc.has(k)); });
+    svg.querySelectorAll('path').forEach(p => p.classList.toggle('hl', i !== null && (+p.dataset.to === i || anc.has(+p.dataset.to)) && (+p.dataset.from === i || anc.has(+p.dataset.from))));
+    if (i === null) { info.innerHTML = '<h2>Select a chip</h2>'; return; }
+    const c = byI.get(i), nm = k => (byI.get(k) || {}).full || (byI.get(k) || {}).label || '?';
+    const chain = c.anc.filter(k => k > 0);
+    info.replaceChildren();
+    const h = document.createElement('h2'); h.textContent = (c.full || c.label) + (i === 0 ? ' (tree root)' : ''); info.appendChild(h);
+    const dl = document.createElement('dl');
+    function row(t, content) { const dt = document.createElement('dt'); dt.textContent = t; const dd = document.createElement('dd'); if (typeof content === 'string') dd.textContent = content; else dd.appendChild(content); dl.append(dt, dd); }
+    // A chip with no hiding rule of its own still cannot be seen while a chip before it is hidden: name the nearest hidden chip(s) on its chain.
+    const hiddenAnc = c.anc.filter(k => k > 0 && byI.get(k) && byI.get(k).hidden);
+    const visReq = (c.hidden || c.extra) ? [] : hiddenAnc.filter(k => !hiddenAnc.some(o => o !== k && byI.get(o).anc.includes(k)));
+    stage.querySelectorAll('.chip').forEach(n => n.classList.toggle('visreq', visReq.includes(+n.dataset.i)));
+    if (visReq.length) {
+      const d = document.createElement('div'); d.append('Not hidden itself, but only appears once ' + (visReq.length > 1 ? 'these hidden chips are' : 'this hidden chip is') + ' revealed: ');
+      visReq.forEach(k => { const p = document.createElement('button'); p.type = 'button'; p.className = 'pill visreq'; p.textContent = nm(k); p.onclick = () => goto(g.name, k); d.appendChild(p); });
+      row('Visibility', d);
+    } else row('Visibility', c.extra ? 'Not normally visible on any tech tree' : (c.hidden ? 'Hidden until unlocked' : 'Visible from the start'));
+    sysRows(row, c.sys);
+    if (c.eng) {                                           // engine stats from the ship guide (output, efficiency, purge, weight in tons)
+      const t = document.createElement('table'), hr = document.createElement('tr');
+      if (c.eng.vertical) {                                // one label / value row per stat (hull stats)
+        t.className = 'st';
+        c.eng.head.forEach((h, k) => { const tr = document.createElement('tr'), x = document.createElement('td'), y = document.createElement('td'); x.textContent = h; y.textContent = c.eng.rows[0][k]; tr.append(x, y); t.appendChild(tr);
+          if (h === 'Hull weight (t)' && c.eng.head[0] === 'Max weight (t)') {            // derived stat: weight left for fittings = max weight - hull weight
+            const mx = +c.eng.rows[0][0], hw = +c.eng.rows[0][k];
+            if (isFinite(mx) && isFinite(hw)) { const d = document.createElement('tr'), a = document.createElement('td'), b = document.createElement('td'); d.className = 'derived'; a.textContent = 'Usable weight (t)'; b.textContent = mx - hw; d.title = 'Derived: max weight - hull weight'; d.append(a, b); t.appendChild(d); }
+          }
+        });
+      } else {
+        t.className = 'st eng';
+        c.eng.head.forEach(h => { const th = document.createElement('th'); th.textContent = h; hr.appendChild(th); }); t.appendChild(hr);
+        c.eng.rows.forEach(r => { const tr = document.createElement('tr'); r.forEach(v => { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); }); t.appendChild(tr); });
+      }
+      row((c.eng.title || 'Engine stats') + (c.eng.note ? ' (' + c.eng.note + ')' : ''), t);
+    }
+    if (g.name === 'PURGE' && funnels['PURGE:' + i]) {     // the funnel models of this smokestack, one per nation and class
+      const d = document.createElement('div');
+      funnels['PURGE:' + i].forEach(([label, id]) => { const a = document.createElement('a'); a.className = 'pill'; a.href = 'models.html#' + id; a.textContent = label; a.title = 'Open this funnel in the model viewer'; d.append(a, ' '); });
+      row('Funnel models', d);
+    }
+    let wThumb = null;                                     // the weapon model's container: the targets row sits above it and the ship classes below, as in the game
+    if (g.name === 'HULLS') {                              // 3D thumbnail of the hull's dock model (links from models/chips.json)
+      const th = modelThumb(modelFor(g.name, i, c.full || c.label), 'hull');
+      if (th) { const d = document.createElement('div'); d.style.margin = '6px 0'; d.appendChild(th); dl.appendChild(d); }
+    } else if (chipModels && chipModels.chips[g.name + ':' + i] && c.stats === null && !['SPECIAL', 'FIGHTER', 'INTERCEPT', 'BOMBER', 'SCOUT', 'HELI'].includes(g.name)) {   // weapons / structures linked by hand (data/weapon_models.json)
+      const th = modelThumb(chipModels.chips[g.name + ':' + i], (g.name === 'BRIDGE' || g.name === 'AFT') ? 'bridge' : 'weapon');
+      if (th) { const d = document.createElement('div'); d.style.margin = '6px 0'; d.appendChild(th); dl.appendChild(d); wThumb = d; }
+    }
+    if (c.stats && c.stats.kind === 'aircraft') {
+      const s = c.stats, t = document.createElement('table'); t.className = 'st';
+      const add = (a, b) => { const tr = document.createElement('tr'); const x = document.createElement('td'); x.textContent = a; const y = document.createElement('td'); y.textContent = b; tr.append(x, y); t.appendChild(tr); };
+      { const d = document.createElement('div'); d.style.margin = '6px 0'; d.appendChild(gearChips(s.gear, modelThumb(modelFor(g.name, i, c.full || c.label)))); dl.appendChild(d); }
+      add('Speed', s.speed); add('Range', s.range); add('Endurance', s.endurance);
+      add('Night missions', s.night ? 'Yes' : 'No'); add('Heavy weather', s.heavy_weather ? 'Yes' : 'No');
+      s.weapons.forEach((w, k) => add('Weapon ' + (k + 1), w.name + ' ×' + w.rounds));
+      row('Aircraft stats', t);
+    }
+    const ws = wstats['chip:' + g.name + ':' + i];
+    if (ws) {
+      const chipRow = (labels, flags) => { const d = document.createElement('div'); d.className = 'wchips'; labels.forEach(([ch, nmx]) => { const s = document.createElement('span'); s.className = 'wchip' + (flags.includes(ch) ? ' on' : ''); s.textContent = nmx; d.appendChild(s); }); return d; };
+      const rowFull = el => { const d = document.createElement('div'); d.style.margin = '6px 0'; d.appendChild(el); dl.appendChild(d); };
+      if (wThumb) { const d = document.createElement('div'); d.style.margin = '6px 0'; d.appendChild(chipRow([['S', 'SFC'], ['A', 'AIR'], ['U', 'SUB'], ['a', 'AUTO'], ['u', 'UWW']], ws.att)); dl.insertBefore(d, wThumb); }
+      else rowFull(chipRow([['S', 'SFC'], ['A', 'AIR'], ['U', 'SUB'], ['a', 'AUTO'], ['u', 'UWW']], ws.att));
+      rowFull(chipRow([['d', 'DD'], ['c', 'CA'], ['B', 'BB'], ['V', 'CV'], ['C', 'BC'], ['f', 'FF'], ['s', 'SS']], ws.mount));
+      const t = document.createElement('table'); t.className = 'st';
+      [['Damage', ws.dam], ['Reload', ws.rld], ['Rounds', ws.rnds], ['Dispersion', ws.dis], ['Range', ws.rng], ['Weight', ws.wt]].forEach(([a, b]) => { const tr = document.createElement('tr'); const x = document.createElement('td'); x.textContent = a; const y = document.createElement('td'); y.textContent = b; tr.append(x, y); t.appendChild(tr); });
+      row('Weapon stats', t);
+      if (ws.note) row('Notes', ws.note);
+    }
+    if (c.extra) {
+      const fi = c.found_in || [];
+      if (fi.length) { const ul = document.createElement('ul'); ul.className = 'conds'; fi.forEach(f => { const li = document.createElement('li'); li.textContent = f; ul.appendChild(li); }); row('How it is found', ul); }
+      if (c.missions && c.missions.length) row(fi.length ? 'Also found in missions' : 'How it is found', missionList(c.missions));
+      else if (!fi.length) row('How it is found', 'Not listed in the mission guide');
+    }
+    if (c.conds && c.conds.length) {
+      const ul = document.createElement('ul'); ul.className = 'conds';
+      c.conds.forEach(k => {
+        const li = document.createElement('li');
+        if (k.kind === 'chip') { li.append(k.text + ': '); const p = document.createElement('button'); p.className = 'pill'; p.textContent = k.label + (k.group !== g.name ? ' (' + k.group + ')' : ''); p.onclick = () => goto(k.group, k.idx); li.appendChild(p); }
+        else li.textContent = k.text;
+        ul.appendChild(li);
+      });
+      row('Unlock conditions', ul);
+    } else if (i > 0 && !c.extra) row('Unlock conditions', 'None recorded');
+    const bmod = bridgeModels[g.name + ':' + i];
+    if (bmod) {
+      const t = document.createElement('table'); t.className = 'st';
+      [['Command', bmod.command], ['Radar', bmod.radar], ['Sonar', bmod.sonar], ['Weight (t)', bmod.weight]].forEach(([a, b]) => { const tr = document.createElement('tr'), x = document.createElement('td'), y = document.createElement('td'); x.textContent = a; y.textContent = b; tr.append(x, y); t.appendChild(tr); });
+      row('Bridge stats (from the game data)', t);
+    }
+    const users = chipUsers[g.name + ':' + i];
+    if (users) {
+      const ul = document.createElement('ul'); ul.className = 'conds';
+      users.forEach(({ b, p }) => {
+        const li = document.createElement('li'); li.append(p.count + ' × ' + (p.barrels ? p.barrels + '-barrel ' : '') + 'on ');
+        const a = document.createElement('button'); a.type = 'button'; a.className = 'pill'; a.textContent = b.name; a.title = 'Open the blueprint';
+        a.onclick = () => { const t = [...document.querySelectorAll('button.tab')].find(x => /^CLASSIFIED/.test(x.textContent.trim())); if (t) t.click(); const it = classified && classified.sections.flatMap(s => s.items).find(x => x.name === b.name && x.nation === b.nation && x.ship_type === b.ship_type); if (it) showClassInfo(it); };
+        li.appendChild(a); ul.appendChild(li);
+      });
+      row('Used by secret blueprints', ul);
+    }
+    info.appendChild(dl);
+    // bridges have no real counterpart of their own: reference the real classes of the blueprints that use them (battlecarrier blueprints included)
+    if (users && (g.name === 'BRIDGE' || g.name === 'AFT')) {
+      // same layout as every other real-world reference: bold Wikipedia link, then the nation; a blueprint with no Wikipedia page is listed by its game name
+      const box = document.createElement('div'); box.className = 'rw';
+      const l = document.createElement('div'); l.className = 'lbl'; l.textContent = 'Real-world reference'; box.appendChild(l);
+      const seen = new Set();
+      users.forEach(({ b }) => {
+        const key = b.wiki || b.name; if (seen.has(key)) return; seen.add(key);
+        const p = document.createElement('div'); p.style.fontWeight = '600';
+        if (b.url) { const a = document.createElement('a'); a.href = b.url; a.textContent = b.wiki; a.target = '_blank'; a.rel = 'noopener'; p.appendChild(a); } else p.textContent = b.name;
+        const m = document.createElement('div'); m.textContent = b.nation;
+        box.append(p, m);
+      });
+      info.appendChild(box);
+    }
+    if (i > 0) { const rwp = realWorldPanel('chip:' + g.name + ':' + i, c.full || c.label, ''); if (rwp) info.appendChild(rwp); }
+    if (g.name === 'HULLS' && hullOfChip['HULLS:' + i]) { const hp = hullBlueprintPanel(hullOfChip['HULLS:' + i]); if (hp) info.appendChild(hp); }
+  }
+  // search across every tree
+  // the game writes Roman numerals and Greek letters as single Unicode characters; also index plain-letter spellings so "battleship iv" or "alpha" work
+  const ASCII = { 'Ⅰ': 'I', 'Ⅱ': 'II', 'Ⅲ': 'III', 'Ⅳ': 'IV', 'Ⅴ': 'V', 'Ⅵ': 'VI', 'Ⅶ': 'VII', 'Ⅷ': 'VIII', 'Ⅸ': 'IX', 'Ⅹ': 'X',
+    'α': 'alpha', 'β': 'beta', 'γ': 'gamma', 'δ': 'delta', 'ε': 'epsilon', 'ζ': 'zeta', 'η': 'eta', 'θ': 'theta', 'ι': 'iota', 'κ': 'kappa' };
+  const plain = s => s.replace(/[Ⅰ-Ⅹα-κ]/g, m => ASCII[m] || m);
+  const index = [];
+  data.categories.forEach(cc => cc.groups.forEach(gg => gg.chips.forEach(ch => { if (ch.i > 0) { const f = ch.full || ch.label; index.push({ g: gg.name, i: ch.i, full: f, label: ch.label, key: (f + ' ' + ch.label + ' ' + plain(f)).toLowerCase() }); } })));
+  const qEl = document.getElementById('q'), resEl = document.getElementById('results');
+  qEl.addEventListener('input', () => {
+    const t = qEl.value.trim().toLowerCase();
+    if (t.length < 2) { resEl.hidden = true; return; }
+    const hits = index.filter(x => x.key.includes(t)).slice(0, 40);
+    resEl.replaceChildren(...hits.map(h => { const b = document.createElement('button'); b.type = 'button'; const a = document.createElement('span'); a.textContent = h.full; const s = document.createElement('small'); s.textContent = h.g; b.append(a, s); b.onclick = () => { resEl.hidden = true; goto(h.g, h.i); }; return b; }));
+    if (!hits.length) { const p = document.createElement('div'); p.style.padding = '8px 10px'; p.textContent = 'No matches'; resEl.replaceChildren(p); }
+    resEl.hidden = false;
+  });
+  document.addEventListener('click', e => { if (!e.target.closest('.search')) resEl.hidden = true; });
+  function setLayout(m) {
+    mode = m; try { localStorage.setItem('wg2.layout', m); } catch (e) {}
+    renderTabs();
+    if (!inClass) { let keep = sel; const t = current && current.chips.find(c => c.i === keep); if (m === 'collapsed' && t && t.sub) keep = null; renderTree(); if (keep !== null && keep !== undefined) select(keep); }
+  }
+  document.getElementById('layStd').onclick = () => setLayout('standard');
+  document.getElementById('layCmp').onclick = () => setLayout('compact');
+  document.getElementById('layCol').onclick = () => setLayout('collapsed');
+  renderTabs(); renderTree();
+  // deep links: #GROUP:index opens a chip, #cls:Name opens a CLASSIFIED item
+  function openHash() {
+    let h = ''; try { h = decodeURIComponent(location.hash.slice(1)); } catch (e) {}
+    fromNav = true;
+    try { openState(h); } finally { fromNav = false; }
+  }
+  function openState(h) {
+    if (!h) {                                  // no hash = the page's starting state (reached by going Back to the first entry)
+      if (cat !== 0 || grp !== 0 || sel !== null || inClass) { inClass = false; cat = 0; grp = 0; sel = null; renderTabs(); renderTree(); }
+      return;
+    }
+    if (h === 'classified') { inClass = true; renderTabs(); renderClassified(); return; }
+    let gi = -1, ci = -1; data.categories.forEach((cc, a) => cc.groups.forEach((gg, b) => { if (gg.name === h) { ci = a; gi = b; } }));
+    if (gi >= 0) { inClass = false; cat = ci; grp = gi; sel = null; renderTabs(); renderTree(); return; }      // #GROUP alone opens a tree
+    if (h.startsWith('cls:')) {
+      const t = [...document.querySelectorAll('button.tab')].find(b => /^CLASSIFIED/.test(b.textContent.trim())); if (t) t.click();
+      const it = classified && classified.sections.flatMap(s => s.items).find(i => i.name === h.slice(4)); if (it) showClassInfo(it);
+    } else if (h.startsWith('sys:')) {      // guide-only system chip (High Gravity Shield, Ammo-Assembler), found by name
+      for (const c of data.categories) for (const g of c.groups) { const ch = g.chips.find(x => x.extra && x.full === h.slice(4)); if (ch) { goto(g.name, ch.i); return; } }
+    } else { const m = h.match(/^(.+):(\d+)$/); if (m) goto(m[1], +m[2]); }
+  }
+  window.addEventListener('hashchange', openHash); openHash();
+})();
+</script>
+</body>
+</html>
+

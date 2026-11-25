@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Warship Gunner 2 Compendium</title>
+<style>
+  :root{--bg:#0b1220;--panel:#141f33;--line:#3b4d6b;--text:#e8eef9;--muted:#9fb0c8;--accent:#4cc2ff}
+  @media (prefers-color-scheme:light){:root{--bg:#f6f8fc;--panel:#fff;--line:#b8c4d6;--text:#16202e;--muted:#566377;--accent:#0b72c9}}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;display:flex;flex-direction:column;height:100vh}#app{display:flex;flex:1;min-height:0}
+  #list{width:260px;border-right:1px solid var(--line);display:flex;flex-direction:column;background:var(--panel)}
+  #list header{padding:10px 12px;border-bottom:1px solid var(--line)} h1{font-size:16px;margin:0 0 6px} a{color:var(--accent)}
+  #q{width:100%;box-sizing:border-box;padding:6px 8px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:5px;font:inherit}
+  #vt{display:flex;gap:6px;margin-top:6px} .vtb{flex:1;padding:4px 8px;background:var(--bg);color:var(--muted);border:1px solid var(--line);border-radius:5px;font:inherit;font-size:12px;cursor:pointer}
+  .vtb[aria-pressed=true]{color:var(--text);border-color:var(--accent);background:rgba(76,194,255,.18)}
+  #items{overflow:auto;flex:1} .it{display:flex;justify-content:space-between;width:100%;padding:5px 12px;background:none;border:0;color:var(--text);font:inherit;font-size:13px;cursor:pointer;text-align:left}
+  .it:hover{background:rgba(76,194,255,.12)} .it[aria-pressed=true]{background:rgba(76,194,255,.25)} .it small{color:var(--muted)}
+  .hd,.sh{display:block;width:100%;text-align:left;border:0;font:inherit;cursor:pointer}
+  .hd{position:sticky;top:0;z-index:1;padding:6px 12px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text);background:var(--bg);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .sh{padding:5px 12px 3px;font-size:12px;color:var(--accent);font-weight:600;background:none}
+  .hd:hover,.sh:hover{text-decoration:underline}
+  #main{flex:1;position:relative} #cv{width:100%;height:100%;display:block}
+  #bar{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;pointer-events:none}
+  #bar[hidden]{display:none} #bar>*{pointer-events:auto} button.b{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 12px;font:inherit;cursor:pointer}
+  button.b[aria-pressed=true]{outline:2px solid var(--accent)} #info{font-size:13px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 10px}
+</style><script src="shell.js" defer></script></head><body><script src="nav.js"></script>
+<div id="app"><div id="list"><header><h1>Model Viewer</h1><input id="q" type="search" placeholder="Filter (chr_1198, U_HE, Duck, boss…)" aria-label="Filter models"><div id="vt" role="group" aria-label="Model versions"><button type="button" class="vtb" data-v="Dock" aria-pressed="true" title="Dock (shipyard) models">Dock</button><button type="button" class="vtb" data-v="In-game" aria-pressed="true" title="Models used in missions">In-game</button></div></header><div id="items"></div></div>
+<div id="main"><canvas id="cv"></canvas><canvas id="uvc" hidden style="position:absolute;right:10px;bottom:10px;width:384px;height:384px;border:1px solid var(--line);background:#000"></canvas><div id="bar"><span id="parts"></span><span id="ups"></span><button class="b" id="wire" aria-pressed="false">Wireframe</button><button class="b" id="tex" aria-pressed="true">Texture</button><button class="b" id="uvb" aria-pressed="false">UV map</button><label id="wat" style="display:inline-flex;gap:4px;align-items:center;font-size:12px;margin-left:6px"><input type="checkbox" id="watc"> Water <select id="wats" title="sea texture from the game's map archive"><option value="11">clear</option><option value="10">sparkling</option><option value="8">dark</option><option value="2">grey</option><option value="1">rough</option></select></label><span id="info"></span></div></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="water.js"></script>
+<script src="dockprops.js"></script>
+<script>
+(async function () {
+  const index = await (await fetch('models/index.json')).json();
+  try { index.push(...await (await fetch('models/composites.json', { cache: 'no-cache' })).json()); } catch (e) {}      // assembled models (tools/build_composite.py)
+  let names = {}; try { names = await (await fetch('models/names.json', { cache: 'no-store' })).json(); } catch (e) {}   // hand-written names: {"chr_689": "F-15-like jet"}
+  // tech tree names: models/chips.json maps tech tree chips ('GROUP:i') to model ids. Many chips share one model (tiers, calibres, variants), so a model gets short names:
+  //  - weapons: the tree names are sorted into families (all machine guns -> "Machine Gun", all VLS missiles -> "VLS"); the tier numbers and, when calibres are mixed, the calibre are dropped.
+  //    A model that is really several kinds of weapon (Gun + Salute Gun) gets one row per kind. Names that would still collide get the calibre range added.
+  //  - everything else (aircraft ...): the tree names with tiers dropped, the words they share, or the first name plus a count.
+  // The tooltip lists every tree name; hand-written names in names.json (a string, or an array for several rows) come first.
+  const treeNames = {};
+  try {
+    const [ch, tr] = await Promise.all([fetch('models/chips.json').then(r => r.json()), fetch('tree.json').then(r => r.json())]);
+    let br = {}; try { br = await (await fetch('bridge_models.json')).json(); } catch (e) {}
+    const chipsMap = Object.assign({}, ch.chips); for (const [k, v] of Object.entries(br)) if (!chipsMap[k]) chipsMap[k] = v.id;
+    const full = {}; tr.categories.forEach(c => c.groups.forEach(g => g.chips.forEach(x => { if (x.i > 0) full[g.name + ':' + x.i] = x.full || x.label; })));
+    const catOf = {}; index.forEach(m => { catOf[m.id] = m.cat; });
+    // (a number after "Model" / "Type" is part of the name, not a tier)
+    const TIER = /^(?:[IVX]+|\d+|Mk\d+[a-z]?|\d+Cal)$/, strip = n => { const t = n.split(/\s+/); while (t.length > 1 && TIER.test(t[t.length - 1]) && !/^(model|type)$/i.test(t[t.length - 2])) t.pop(); return t.join(' '); };
+    const by = {}; for (const [k, id] of Object.entries(chipsMap)) { const n = full[k]; if (n) { const l = by[id] = by[id] || []; if (!l.includes(n)) l.push(n); } }
+    const common = (T, rev) => { const out = []; const L = Math.min(...T.map(t => t.length)); for (let i = 0; i < L; i++) { const ws = T.map(t => t[rev ? t.length - 1 - i : i]); if (new Set(ws).size === 1) out.push(ws[0]); else break; } return rev ? out.reverse() : out; };
+    // ---- weapons ----
+    const FAMILY = [[/UWW Tur/, 'UWW Turret Torpedo'], [/Torpedo|Trp/, 'Torpedo'], [/Machine Gun/, 'Machine Gun'], [/CIWS/, 'CIWS'], [/AGS/, 'AGS'], [/High-V/, 'High-V Gun'], [/Gatling/, 'Gatling Cannon'],
+      [/Revolving/, 'Revolving Gun'], [/VLS/, 'VLS'], [/Rocket Launcher/, 'Rocket Launcher'], [/Mine/, 'Mine'], [/MLRS/, 'MLRS']];
+    const CAL = /^([\d.]+)(cm|mm)$/;
+    function weaponRows(ns) {
+      const fams = new Map();
+      for (const n of ns) {
+        let t = n.split(/\s+/), cal = null, brls = 0;
+        if (CAL.test(t[0])) cal = t.shift();
+        t = t.filter(w => { const m = /^(\d+)brls$/.exec(w); if (m) { brls = +m[1]; return false; } return !/^\d+b$/.test(w) && !/^\d+Cal$/.test(w); });
+        if (t[0] === 'New' && t.length > 1 && ns.length > 1) t.shift();      // "New X" is an upgrade of X: same model, same row (a lone "New X" keeps its name)
+        while (t.length > 1 && TIER.test(t[t.length - 1])) t.pop();
+        let base = t.join(' '); const f = FAMILY.find(x => x[0].test(n)); if (f) base = f[1];
+        if (!fams.has(base)) fams.set(base, { base, cals: new Set(), brls: new Set() });
+        const e = fams.get(base); if (cal) e.cals.add(cal); e.brls.add(brls);
+      }
+      return [...fams.values()].map(e => {
+        const cals = [...e.cals], b = [...e.brls];
+        const range = cals.length > 1 ? (() => { const v = cals.map(c => parseFloat(c)), u = CAL.exec(cals[0])[2]; const f = x => u === 'cm' ? x.toFixed(1) : String(x); return f(Math.min(...v)) + '–' + f(Math.max(...v)) + u; })() : null;
+        return { name: (cals.length === 1 ? cals[0] + ' ' : '') + e.base, details: b.length === 1 && b[0] > 1 ? [b[0] + ' barrels'] : [], range };
+      });
+    }
+    const wrows = {};
+    for (const [id, ns] of Object.entries(by)) if (catOf[id] === 'player weapon' && ns.length) wrows[id] = weaponRows(ns);
+    const used = {}; for (const rows of Object.values(wrows)) rows.forEach(r => { const k = r.name + '|' + r.details.join(); used[k] = (used[k] || 0) + 1; });
+    const fmt = r => { const d = r.details.slice(); if (r.range && used[r.name + '|' + r.details.join()] > 1) d.push(r.range); return r.name + (d.length ? ' (' + d.join(', ') + ')' : ''); };
+    // ---- everything else ----
+    function otherLabel(ns) {
+      if (ns.length === 1) return ns[0];
+      const S = [...new Set(ns.map(strip))]; if (S.length === 1) return S[0];
+      const T = S.map(s => s.split(' ')), p = common(T, false), s = common(T, true);
+      if (p.length && (p.length > 1 || !/^[\d.]+\w*$/.test(p[0]))) return p.join(' ');
+      if (s.length >= 2 && !/^\d+brls$/.test(s[s.length - 1])) return s.join(' ');
+      return S[0] + ' +' + (S.length - 1);
+    }
+    for (const [id, ns] of Object.entries(by)) {
+      const e = { labels: wrows[id] ? wrows[id].map(fmt) : [otherLabel(ns)], all: ns }; treeNames[id] = e;
+      const twin = id.replace('weph', 'wepl'); if (twin !== id) treeNames[twin] = e;      // the in-game (L) file of a dock (H) weapon model
+      const hm = index.find(m => m.id === id), lt = hm && /H$/.test(hm.name || '') && index.find(m => m.archive === hm.archive && m.name === hm.name.replace(/H$/, 'L'));
+      if (lt && !treeNames[lt.id]) treeNames[lt.id] = e;      // same for hulls, bridges ...: the in-game (L) twin of a dock (H) ship model carries the same names
+    }
+  } catch (e) {}
+  // list order: type (category), then class, then internal name (which sorts by nation and number); low-detail twins (…L) follow their high-detail file
+  const CATS = ['composite', 'dock', 'aircraft', 'enemy ship', 'superweapon', 'superweapon part', 'player ship part', 'player weapon', 'map object', 'dock scenery', 'pickup item', 'effect', 'other'];
+  const CATNAME = { 'composite': 'Composite bosses', 'dock': 'Docks','aircraft': 'Aircraft', 'enemy ship': 'Ships (in-game units)', 'superweapon': 'Superweapons', 'superweapon part': 'Superweapon parts', 'player ship part': 'Player ship parts (hulls, bridges, funnels)', 'player weapon': 'Player weapons', 'map object': 'Map objects', 'dock scenery': 'Dock scenery', 'pickup item': 'Pickup items', 'effect': 'Effects', 'other': 'Other' };
+  const ci = m => { const i = CATS.indexOf(m.cat); return i < 0 ? CATS.length : i; };
+  const bossNo = m => /^(BOS|BF)\d\d/.test(m.name || '') ? m.name.slice(m.name.startsWith('BF') ? 2 : 3, m.name.startsWith('BF') ? 4 : 5) : '';      // superweapons keep their boss number order (Wirbelwind = 00 ...)
+  index.sort((a, b) => ci(a) - ci(b) || bossNo(a).localeCompare(bossNo(b)) || (a.cls || '').localeCompare(b.cls || '') || (a.name || '').localeCompare(b.name || '', undefined, { numeric: true }) || a.entry - b.entry);
+  const itemsEl = document.getElementById('items'), info = document.getElementById('info'), q = document.getElementById('q');
+  const cv = document.getElementById('cv'), renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(45, 1, 1, 200000);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x667788, 1.6)); const dl = new THREE.DirectionalLight(0xffffff, 1.0); dl.position.set(1, 2, 1.5); scene.add(dl);
+  const group = new THREE.Group(); scene.add(group);
+  let cur = null, partIdx = 0, up = 'z', wire = false, mesh = null, meshes = [], radius = 1, yaw = 0.8, pitch = 0.4, dist = 3, buf = null;
+  const sky = getComputedStyle(document.body).backgroundColor; scene.background = new THREE.Color(sky);
+  function resize() { const r = cv.parentElement.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix(); }
+  addEventListener('resize', resize); resize();
+  let texImg = null, showTex = true, showUV = false, dockCols = null, propGroup = null, buildSeq = 0;      // dockCols: the dock's baked face colours (3 bytes per face, 128 = neutral)
+  const texCache = {};
+  function getTexture(m) {
+    if (m.tex == null) return null;
+    if (!texCache[m.id]) { const t = new THREE.TextureLoader().load('models/' + m.id + '.png', () => build()); t.flipY = false; t.wrapS = t.wrapT = THREE.RepeatWrapping; if (!/^dock_tile_/.test(m.id)) t.encoding = THREE.sRGBEncoding; texCache[m.id] = t; }      // the dock atlases are drawn raw (the PS2 multiplies the raw texture by the face colour)
+    return texCache[m.id];
+  }
+  // one part of the loaded model as geometry (not yet centred); also returns the offsets the UV overlay needs
+  function partGeom(k) {
+    let off = 0, p = null, qoff = 0;
+    cur.parts.forEach((pp, j) => { if (j === k) p = pp; if (!p) { off += pp.v * 12 + pp.q * 8 + pp.q * 16; qoff += pp.q; } });
+    const dv = new DataView(buf), nv = p.v, nq = p.q, V = new Float32Array(nv * 3);
+    for (let i = 0; i < nv * 3; i++) V[i] = dv.getFloat32(off + i * 4, true);
+    const qo = off + nv * 12, uo = qo + nq * 8, pos = [], uv = [], col = [], vid = [];
+    for (let q = 0; q < nq; q++) {
+      const q4 = [0, 1, 2, 3].map(j => dv.getUint16(qo + (q * 4 + j) * 2, true)), U = [0, 1, 2, 3].map(j => [dv.getUint16(uo + (q * 8 + j * 2) * 2, true) / 16384, dv.getUint16(uo + (q * 8 + j * 2 + 1) * 2, true) / 16384]);
+      let tris = q4[2] === q4[3] ? [[0, 1, 2]] : [[0, 1, 2], [0, 2, 3]];
+      if (q4[2] !== q4[3]) {       // a non-convex quad leaves a hole with the wrong diagonal: pick the split whose two triangles face the same way
+        const P = q4.map(vi => [V[vi * 3], V[vi * 3 + 1], V[vi * 3 + 2]]), sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+        const nrm = (a, b, c) => { const u = sub(b, a), v = sub(c, a); return [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]; };
+        const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        const d1 = dot(nrm(P[0], P[1], P[2]), nrm(P[0], P[2], P[3])), d2 = dot(nrm(P[0], P[1], P[3]), nrm(P[1], P[2], P[3]));
+        if (d2 > d1) tris = [[0, 1, 3], [1, 2, 3]];
+      }
+      const noUV = U.every(p2 => p2[0] === 0 && p2[1] === 0);      // faces without a texture record are drawn grey
+      for (const t of tris) for (const c of t) { const vi = q4[c]; vid.push(vi); pos.push(V[vi * 3], V[vi * 3 + 1], V[vi * 3 + 2]); uv.push(U[c][0], U[c][1]); const g2 = noUV ? 0.7 : 1; if (dockCols) col.push(dockCols[(qoff + q) * 3] / 128, dockCols[(qoff + q) * 3 + 1] / 128, dockCols[(qoff + q) * 3 + 2] / 128); else col.push(g2, g2, g2); }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals(); g.computeBoundingBox(); if (p.anim && p.anim.bob) g.userData.vid = Int32Array.from(vid);      // the source vertex of every corner: lets a part move its pieces one by one (anim.bob)
+    return { g, p, dv, qo, uo };
+  }
+  // Animated composites (data/composite_*.json "anim", built into models/composites.json): a part either spins at a steady rate or is turned by deg * f(t) about a pivot and axis
+  // (model space; f eased between the keyframes [[seconds, fraction], ...] and repeating after the last one). A part with a "parent" moves with that part. Viewer only, not game data.
+  let animMeshes = [], animT = 0, animLast = performance.now(), animOn = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const animBtn = document.createElement('button'); animBtn.className = 'b'; animBtn.id = 'anim'; animBtn.textContent = 'Animate'; animBtn.hidden = true; animBtn.title = 'Play or pause the motion of this model (the cannon, fins, drones ...)';
+  animBtn.setAttribute('aria-pressed', animOn); animBtn.onclick = () => { animOn = !animOn; animBtn.setAttribute('aria-pressed', animOn); };
+  document.getElementById('wire').after(animBtn);
+  function setupAnim() {
+    animMeshes = meshes.filter(m => m.userData.part && m.userData.part.anim); animBtn.hidden = !animMeshes.length;
+    animMeshes.forEach(m => { const an = m.userData.part.anim; m.matrixAutoUpdate = false; m.userData.up = new THREE.Matrix4().makeRotationFromEuler(m.rotation); m.userData.pv = new THREE.Vector3(...an.pivot).sub(ctr); m.userData.ax = new THREE.Vector3(...an.axis).normalize();
+      if (an.bob) { const pa = m.geometry.attributes.position; m.userData.base = pa.array.slice(); m.userData.vid = m.geometry.userData.vid; }      // base positions for the bobbing
+    });
+    animUpdate(animT);
+  }
+  function animAngle(an, t) {
+    if (an.spin != null) return an.spin * t * Math.PI / 180;
+    const k = an.keys, cyc = k[k.length - 1][0], tt = t % cyc; let i = 0; while (i < k.length - 2 && tt >= k[i + 1][0]) i++;
+    const a = k[i], b = k[i + 1], u = b[0] > a[0] ? Math.min(1, Math.max(0, (tt - a[0]) / (b[0] - a[0]))) : 1, s = u * u * (3 - 2 * u);
+    return an.deg * (a[1] + (b[1] - a[1]) * s) * Math.PI / 180;
+  }
+  // anim.bob = { count, amp, period }: the part is count identical pieces (equal vertex ranges, one after the other); each one slides up and down along the model's z axis by +-amp, once per period seconds, every piece with its own phase.
+  function bob(m, t) {
+    const b = m.userData.part.anim.bob, pa = m.geometry.attributes.position, A = pa.array, B = m.userData.base, vid = m.userData.vid, per = m.userData.part.v / b.count;
+    const ph = []; for (let i = 0; i < b.count; i++) { const s = Math.sin((i + 1) * 12.9898) * 43758.5453; ph.push((s - Math.floor(s)) * 2 * Math.PI); }
+    const off = ph.map(f => b.amp * Math.sin(2 * Math.PI * t / b.period + f));
+    for (let k = 0; k < vid.length; k++) A[k * 3 + 2] = B[k * 3 + 2] + off[Math.min(b.count - 1, Math.floor(vid[k] / per))];
+    pa.needsUpdate = true;
+  }
+  function animUpdate(t) {
+    if (!animMeshes.length) return;
+    const byId = {}, memo = {}; animMeshes.forEach(m => { byId[m.userData.part.anim.id] = m; });
+    const A = m => {
+      const an = m.userData.part.anim; if (memo[an.id]) return memo[an.id];
+      const par = an.parent && byId[an.parent], M = par ? A(par).clone() : new THREE.Matrix4(), pv = m.userData.pv;
+      M.multiply(new THREE.Matrix4().makeTranslation(pv.x, pv.y, pv.z)).multiply(new THREE.Matrix4().makeRotationAxis(m.userData.ax, animAngle(an, t))).multiply(new THREE.Matrix4().makeTranslation(-pv.x, -pv.y, -pv.z));
+      return memo[an.id] = M;
+    };
+    animMeshes.forEach(m => { m.matrix.copy(m.userData.up).multiply(A(m)); m.matrixWorldNeedsUpdate = true; if (m.userData.base) bob(m, t); });
+  }
+  // Smooth shading: faces are drawn flat by default (every face its own normal). "Smooth" averages the normals of the faces that meet at one point, but only faces within 55 degrees of
+  // each other, so hard edges (boxes, plates, rims) stay sharp while curved surfaces (the duck, barrels) lose their facets. Display only; the geometry is not changed.
+  let smooth = true; try { smooth = localStorage.getItem('wg2.models.smooth') !== '0'; } catch (e) {}      // on by default; only an explicit "off" is remembered
+  const smoothBtn = document.createElement('button'); smoothBtn.className = 'b'; smoothBtn.id = 'smooth'; smoothBtn.textContent = 'Smooth'; smoothBtn.title = 'Smooth shading (keeps hard edges)'; smoothBtn.setAttribute('aria-pressed', smooth);
+  smoothBtn.onclick = () => { smooth = !smooth; smoothBtn.setAttribute('aria-pressed', smooth); try { localStorage.setItem('wg2.models.smooth', smooth ? '1' : '0'); } catch (e) {} build(); };
+  document.getElementById('wire').after(smoothBtn);
+  function smoothNormals(g) {
+    const P = g.attributes.position.array, nt = P.length / 9, fn = new Float32Array(nt * 3), key = new Array(nt * 3), at = new Map(), cosT = Math.cos(55 * Math.PI / 180);
+    for (let t = 0; t < nt; t++) {
+      const o = t * 9, ux = P[o + 3] - P[o], uy = P[o + 4] - P[o + 1], uz = P[o + 5] - P[o + 2], vx = P[o + 6] - P[o], vy = P[o + 7] - P[o + 1], vz = P[o + 8] - P[o + 2];
+      let x = uy * vz - uz * vy, y = uz * vx - ux * vz, z = ux * vy - uy * vx; const l = Math.hypot(x, y, z) || 1; fn[t * 3] = x / l; fn[t * 3 + 1] = y / l; fn[t * 3 + 2] = z / l;
+      for (let c = 0; c < 3; c++) { const k = Math.round(P[o + c * 3] * 4) + ',' + Math.round(P[o + c * 3 + 1] * 4) + ',' + Math.round(P[o + c * 3 + 2] * 4); key[t * 3 + c] = k; (at.get(k) || at.set(k, []).get(k)).push(t); }
+    }
+    const N = new Float32Array(P.length);
+    for (let t = 0; t < nt; t++) for (let c = 0; c < 3; c++) {
+      let x = 0, y = 0, z = 0; const a = fn.subarray(t * 3, t * 3 + 3);
+      for (const u of at.get(key[t * 3 + c])) { const b = fn.subarray(u * 3, u * 3 + 3); if (a[0] * b[0] + a[1] * b[1] + a[2] * b[2] >= cosT) { x += b[0]; y += b[1]; z += b[2]; } }
+      const l = Math.hypot(x, y, z) || 1, o = t * 9 + c * 3; N[o] = x / l; N[o + 1] = y / l; N[o + 2] = z / l;
+    }
+    g.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+  }
+  // The Part N and Up X / Y / Z buttons are hidden (user, 2026-11-14); add ?debug to the address to bring them back (parts are needed to look at a collision hull)
+  { const st = document.createElement('style'); st.textContent = (/[?&]debug\b/.test(location.search) ? '' : '#parts,#ups{display:none !important}'); document.head.appendChild(st); }
+  const upNow = () => (cur && cur.all ? 'z' : up);      // assembled composites are always built z-up: they have no Up X / Y / Z choice
+  function build() {
+    document.getElementById('ups').hidden = !!(cur && cur.all);
+    meshes.forEach(m => { group.remove(m); m.geometry.dispose(); }); meshes = []; mesh = null; animMeshes = []; animBtn.hidden = true;
+    if (propGroup) { group.remove(propGroup); propGroup = null; } const mySeq = ++buildSeq;
+    if (!cur || !buf) return;
+    // an assembled ("composite") model draws all of its parts together, each with the texture named by its texid; every other model shows the selected part
+    const items = (cur.all ? cur.parts.map((_, k) => k) : [partIdx]).map(partGeom); if (smooth) items.forEach(it => smoothNormals(it.g));
+    const box = new THREE.Box3(); items.forEach(it => box.union(it.g.boundingBox));
+    const c = new THREE.Vector3(); box.getCenter(c); radius = 0;
+    if (cur.all && cur.pivot) { c.x = cur.pivot[0]; c.y = cur.pivot[1]; }          // a composite may name its own vertical axis (Hell Atsche: the central gun stand): it is centred and turned about that, not about the middle of its bounding box
+    items.forEach(it => { it.g.translate(-c.x, -c.y, -c.z); it.g.computeBoundingSphere(); radius = Math.max(radius, it.g.boundingSphere.center.length() + it.g.boundingSphere.radius); }); ctr = c.clone();
+    camera.near = Math.max(0.5, radius * 0.02); camera.far = radius * 60; camera.updateProjectionMatrix();
+    items.forEach(it => {
+      const map = showTex ? getTexture(it.p.texid ? { id: it.p.texid, tex: 0 } : cur) : null;
+      const dockMat = cur.cat === 'dock' && dockCols;      // docks: unlit texture x baked face colour, as on the dock page
+      const m = new THREE.Mesh(it.g, dockMat ? new THREE.MeshBasicMaterial({ color: 0xffffff, map, vertexColors: true, side: THREE.DoubleSide, transparent: !!map, alphaTest: map ? 0.4 : 0, wireframe: wire }) : new THREE.MeshStandardMaterial({ color: map ? 0xffffff : 0x8fb4d8, map, vertexColors: true, metalness: 0.05, roughness: 0.8, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1, flatShading: !map && !smooth, wireframe: wire, transparent: !!map, alphaTest: map ? 0.4 : 0 }));
+      // the data is z-up for ships; "up" chooses which source axis points up on screen
+      m.rotation.set(upNow() === 'z' ? -Math.PI / 2 : 0, 0, upNow() === 'x' ? Math.PI / 2 : 0); m.userData.part = it.p; group.add(m); meshes.push(m);
+    });
+    if (cur.cat === 'dock' && window.DockProps) DockProps.build(+cur.id.slice(-1), c).then(gr => { if (mySeq !== buildSeq) return; gr.rotation.x = -Math.PI / 2; group.add(gr); propGroup = gr; });      // the scenery props (the dock page's table placements, spawns, trucks, cranes)
+    setupAnim();
+    mesh = meshes[0]; const first = items[0], part = { p: first.p }, nv = first.p.v, nq = first.p.q;
+    // index.json carries the game's own data: internal model name, the entities that use the model (several can share one), and per part the mesh kind
+    const who = (cur.ents && cur.ents.length ? (cur.inferred ? ' ≈ ' : ' = ') + cur.ents.join(' / ') : cur.desc ? ' · ' + cur.desc : '');
+    // the info line: id, name, entities / description and the part slot of a single part: no vertex, face, part or texture counts
+    dist = radius * 2.6; info.textContent = cur.id + (cur.name ? ' · ' + cur.name : '') + who + (names[cur.id] ? ' (' + names[cur.id] + ')' : '') + (!cur.all && cur.cat !== 'dock scenery' ? ' · part ' + first.p.slot + (first.p.kind === 'collision' ? ' (collision hull, untextured by design)' : '') : '');
+    drawUV(part, first.dv, first.qo, first.uo); placeWater();
+  }
+  // Optional sea: a large plane with the game's sea tile at the model's own zero height (a ship's waterline), so ships and bosses can be seen sitting in water. Not animated.
+  let ctr = new THREE.Vector3(), water = null, waterLevels = {}, waterSet = null, waterObj = null;
+  if (window.WGWater) WGWater.load('water/').then(s => { waterSet = s; placeWater(); }).catch(() => {});      // the smooth, animated water (water.js); until it loads, or if it cannot, the plain tile plane below is used
+  fetch('models/water_levels.json', { cache: 'no-cache' }).then(r => r.json()).then(j => { waterLevels = j; placeWater(); }).catch(() => {});      // hand-written per-model sea levels (flying bosses ...)
+  const watc = document.getElementById('watc'), wats = document.getElementById('wats');
+  try { watc.checked = localStorage.getItem('wg2.models.water') === '1'; const s = localStorage.getItem('wg2.models.watertex'); if (s) wats.value = s; } catch (e) {}
+  function placeWater() {
+    if (water) { scene.remove(water); if (water.geometry) water.geometry.dispose(); if (water.material) water.material.dispose(); if (waterObj) { waterObj.dispose(); waterObj = null; } water = null; }
+    // water only makes sense for whole ships and bosses: not aircraft, weapons, bridges / funnels or other single components
+    const ok = !!cur && (cur.cat === 'enemy ship' || cur.cat === 'superweapon' || cur.cat === 'composite' || cur.cat === 'dock' || (cur.cat === 'player ship part' && /^Hull/.test(cur.cls || '')));
+    watc.disabled = wats.disabled = !ok; document.getElementById('wat').style.opacity = ok ? 1 : 0.4; document.getElementById('wat').title = ok ? '' : 'Water is only available for ships, hulls and bosses';
+    if (!ok || !watc.checked || !mesh) return;
+    const size = Math.max(radius * 40, 40000), tile = 2500;
+    const t = new THREE.TextureLoader().load('models/water_' + wats.value + '.png'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(size / tile, size / tile); t.encoding = THREE.sRGBEncoding; t.anisotropy = 8;
+    if (waterSet) {          // smooth water built from the game's tiles: group of the chosen tile (MAP entries come in threes), scaled to the model
+      const r = Math.max(radius, 800), grp = Math.min(4, Math.floor((+wats.value - 1) / 3));
+      waterObj = WGWater.create(waterSet, { group: grp, row: 'own', size, segments: 160, tile: Math.max(r * 0.9, 1500), waveHeight: cur.cat === 'dock' ? 0 : r * 0.012, /* docks: flat sea, waves would wash over the piers */ waveLength: r * 1.4, fogDensity: 0.5 / (r * 12) });
+      water = waterObj.mesh;
+    } else {
+      water = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide, transparent: true, opacity: 0.92 }));
+      water.rotation.x = -Math.PI / 2;
+    }
+    water.position.y = (cur.waterZ != null ? cur.waterZ : (waterLevels[cur.id] || 0)) - (upNow() === 'z' ? ctr.z : upNow() === 'y' ? ctr.y : ctr.x);      // the model's zero height on screen (the model is centred on its bounding box); some models name their own sea level
+    scene.add(water);
+  }
+  watc.onchange = () => { try { localStorage.setItem('wg2.models.water', watc.checked ? '1' : '0'); } catch (e) {} placeWater(); };
+  wats.onchange = () => { try { localStorage.setItem('wg2.models.watertex', wats.value); } catch (e) {} placeWater(); };
+  // UV overlay: the texture with this part's face outlines drawn on it (for telling skins apart)
+  const uvc = document.getElementById('uvc');
+  function drawUV(part, dv, qo, uo) {
+    uvc.hidden = !showUV; if (!showUV || cur.tex == null) { uvc.hidden = true; return; }
+    const img = new Image(); img.onload = () => {
+      const S = 384, ctx = uvc.getContext('2d'); uvc.width = S; uvc.height = S; ctx.drawImage(img, 0, 0, S, S); ctx.strokeStyle = 'rgba(255,230,0,.9)'; ctx.lineWidth = 1;
+      for (let k = 0; k < part.p.q; k++) {
+        const q4 = [0, 1, 2, 3].map(j => dv.getUint16(qo + (k * 4 + j) * 2, true)), n = q4[2] === q4[3] ? 3 : 4; ctx.beginPath();
+        for (let j = 0; j < n; j++) { const u = dv.getUint16(uo + (k * 8 + j * 2) * 2, true) / 16384 * S, v = dv.getUint16(uo + (k * 8 + j * 2 + 1) * 2, true) / 16384 * S; j ? ctx.lineTo(u, v) : ctx.moveTo(u, v); }
+        ctx.closePath(); ctx.stroke();
+      }
+    }; img.src = 'models/' + cur.id + '.png';
+  }  async function load(m) {
+    cur = m; partIdx = 0; buf = await (await fetch('models/' + m.id + '.bin', { cache: 'no-cache' })).arrayBuffer();
+    dockCols = null; if (m.cat === 'dock' && m.colors) { try { dockCols = new Uint8Array(await (await fetch('models/' + m.colors, { cache: 'no-cache' })).arrayBuffer()); } catch (e) { dockCols = null; } }
+    const pe = document.getElementById('parts'); pe.replaceChildren();
+    m.parts.forEach((p, k) => { const b = document.createElement('button'); b.className = 'b'; b.textContent = 'Part ' + p.slot + (p.kind === 'collision' ? ' (collision)' : ''); b.setAttribute('aria-pressed', k === 0 ? 'true' : 'false'); b.onclick = () => { partIdx = k; [...pe.children].forEach((x, j) => x.setAttribute('aria-pressed', j === k ? 'true' : 'false')); build(); }; pe.appendChild(b); });
+    build(); [...itemsEl.children].forEach(x => x.setAttribute('aria-pressed', x.dataset.id === m.id ? 'true' : 'false'));
+  }
+  let folded = new Set(); try { folded = new Set(JSON.parse(localStorage.getItem('wg2.models.folded') || '[]')); } catch (e) {}
+  const verOn = { 'Dock': true, 'In-game': true };
+  try { const s = JSON.parse(localStorage.getItem('wg2.models.versions') || 'null'); if (s && (s['Dock'] || s['In-game'])) { verOn['Dock'] = !!s['Dock']; verOn['In-game'] = !!s['In-game']; } } catch (e) {}
+  function list() {
+    const t = q.value.trim().toLowerCase(); itemsEl.replaceChildren();
+    // one row per in-game entity: a model shared by several entities (the four Duck aircraft) is listed once for each of them
+    const rows = [];
+    // MDT files come in pairs: the H file is the dock (shipyard) model, the L file the model used in the game
+    index.forEach(m => { const ls = names[m.id] ? [].concat(names[m.id]) : treeNames[m.id] ? treeNames[m.id].labels : (m.ents && m.ents.length ? m.ents : [m.name || m.id]); ls.forEach(l => rows.push({ m, l: l + (m.variant ? ' (' + m.variant + ')' : '') })); });
+    const hay = r => (r.l + ' ' + r.m.id + ' ' + r.m.entry + ' ' + (r.m.name || '') + ' ' + (r.m.cat || '') + ' ' + (r.m.cls || '') + ' ' + (r.m.desc || '') + ' ' + ((treeNames[r.m.id] || {}).all || []).join(' ')).toLowerCase();
+    // sections (type) and sub-sections (class) fold; the folded set is remembered. While a filter is typed everything that matches is shown.
+    let lastCat = null, lastCls = null;
+    const shown = rows.filter(r => (!r.m.variant || verOn[r.m.variant] !== false) && (!t || hay(r).includes(t))), nCat = {}, nCls = {};
+    shown.forEach(({ m }) => { nCat[m.cat] = (nCat[m.cat] || 0) + 1; const k = m.cat + '|' + (m.cls || ''); nCls[k] = (nCls[k] || 0) + 1; });
+    const head = (cls, key, text, n) => { const h = document.createElement('button'); h.type = 'button'; h.className = cls; const open = !!t || !folded.has(key); h.setAttribute('aria-expanded', open); h.textContent = (open ? '▾ ' : '▸ ') + text + ' (' + n + ')'; h.onclick = () => { folded.has(key) ? folded.delete(key) : folded.add(key); try { localStorage.setItem('wg2.models.folded', JSON.stringify([...folded])); } catch (e) {} list(); }; itemsEl.appendChild(h); };
+    shown.forEach(({ m, l }) => {
+      const ck = m.cat + '|' + (m.cls || '');
+      if (m.cat !== lastCat) { head('hd', m.cat, CATNAME[m.cat] || m.cat || 'Other', nCat[m.cat]); lastCat = m.cat; lastCls = null; }
+      if (!t && folded.has(m.cat)) return;
+      if ((m.cls || '') !== lastCls) { lastCls = m.cls || ''; if (lastCls) head('sh', ck, lastCls, nCls[ck]); }
+      if (!t && folded.has(ck)) return;
+      // name only; the file id is in the info bar and the tooltip
+      const b = document.createElement('button'); b.className = 'it'; b.dataset.id = m.id; b.title = m.id + ' · ' + (m.name || '') + (treeNames[m.id] && treeNames[m.id].all.length > 1 ? ' (tech tree: ' + treeNames[m.id].all.join(', ') + ')' : '') + (m.ents && m.ents.length > 1 ? ' (shared by: ' + m.ents.join(', ') + ')' : ''); b.setAttribute('aria-pressed', cur && cur.id === m.id ? 'true' : 'false'); b.textContent = l;
+      b.onclick = () => { load(m); history.replaceState(null, '', '#' + m.id); }; itemsEl.appendChild(b);
+    });
+  }
+  // Dock / In-game toggles: models that come as a dock + in-game pair follow them, at least one stays on; models without a pair are always listed
+  document.querySelectorAll('#vt .vtb').forEach(b => {
+    b.onclick = () => {
+      const on = Object.keys(verOn).filter(k => verOn[k]);
+      if (verOn[b.dataset.v] && on.length === 1) return;          // the last active one cannot be switched off
+      verOn[b.dataset.v] = !verOn[b.dataset.v]; b.setAttribute('aria-pressed', verOn[b.dataset.v]);
+      try { localStorage.setItem('wg2.models.versions', JSON.stringify(verOn)); } catch (e) {}
+      list();
+    };
+    b.setAttribute('aria-pressed', verOn[b.dataset.v]);
+  });
+  q.addEventListener('input', list); list();
+  const ups = document.getElementById('ups');
+  ['z', 'y', 'x'].forEach(a => { const b = document.createElement('button'); b.className = 'b'; b.textContent = 'Up ' + a.toUpperCase(); b.setAttribute('aria-pressed', a === up ? 'true' : 'false'); b.onclick = () => { up = a; [...ups.children].forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false')); build(); }; ups.appendChild(b); });
+  document.getElementById('tex').onclick = e => { showTex = !showTex; e.target.setAttribute('aria-pressed', showTex); build(); };
+  document.getElementById('uvb').onclick = e => { showUV = !showUV; e.target.setAttribute('aria-pressed', showUV); build(); };
+  document.getElementById('wire').onclick = e => { wire = !wire; e.target.setAttribute('aria-pressed', wire); build(); };
+  let drag = null; cv.addEventListener('pointerdown', e => { drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointerup', () => drag = null);
+  cv.addEventListener('pointermove', e => { if (!drag) return; yaw -= (e.clientX - drag[0]) * 0.008; pitch = Math.max(-1.5, Math.min(1.5, pitch + (e.clientY - drag[1]) * 0.008)); drag = [e.clientX, e.clientY]; });
+  cv.addEventListener('wheel', e => { e.preventDefault(); dist *= e.deltaY > 0 ? 1.1 : 0.9; }, { passive: false });
+  (function frame() { const now = performance.now(); if (animOn) animT += (now - animLast) / 1000; animLast = now; animUpdate(animT); if (waterObj) waterObj.update(now / 1000); camera.position.set(Math.sin(yaw) * Math.cos(pitch) * dist, Math.sin(pitch) * dist, Math.cos(yaw) * Math.cos(pitch) * dist); camera.lookAt(0, 0, 0); renderer.render(scene, camera); requestAnimationFrame(frame); })();
+  // a model opened from a link or the address bar: unfold its section and sub-section, make sure its Dock / In-game version is listed, and scroll it into view in the list
+  function reveal(m) {
+    let changed = false;
+    for (const k of [m.cat, m.cat + '|' + (m.cls || '')]) if (folded.delete(k)) changed = true;          // not saved: it only opens the folders for this visit
+    if (m.variant && verOn[m.variant] === false) { verOn[m.variant] = true; document.querySelectorAll('#vt .vtb').forEach(b => b.setAttribute('aria-pressed', verOn[b.dataset.v])); changed = true; }
+    if (changed) list();
+    let it = itemsEl.querySelector('.it[data-id="' + m.id + '"]');
+    if (!it && q.value.trim()) { q.value = ''; list(); it = itemsEl.querySelector('.it[data-id="' + m.id + '"]'); }                          // a typed filter was hiding it
+    if (it) it.scrollIntoView({ block: 'center' });
+  }
+  const pick = () => index.find(m => m.id === location.hash.slice(1));
+  addEventListener('hashchange', () => { const m = pick(); if (m && m !== cur) load(m).then(() => reveal(m)); });
+  { const m0 = pick(); const first = m0 || index.find(m => m.id === 'chr_1672') || index[0]; load(first).then(() => { if (m0) reveal(m0); }); }
+})();
+</script></body></html>

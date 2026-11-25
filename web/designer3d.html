@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ship Designer 3D - Warship Gunner 2</title>
+<style>
+:root{--bg:#07142b;--ink:#e8f0ff;--dim:#7f9cc8;--accent:#53d6ff;--panel:#101f38}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#050d1c;color:var(--ink);font:14px/1.4 "Segoe UI",system-ui,sans-serif;overflow:hidden}
+#view{position:fixed;inset:0;display:block;width:100%;height:100%}
+#bar{position:fixed;top:0;left:0;right:0;display:flex;gap:10px;align-items:center;padding:8px 12px;flex-wrap:wrap;background:linear-gradient(#050d1cee,#050d1c00);z-index:2}
+.plate{background:linear-gradient(#8d949f,#5b616c);color:#dff6ff;font-weight:600;letter-spacing:.08em;padding:5px 22px 5px 14px;clip-path:polygon(0 0,100% 0,92% 100%,0 100%);text-shadow:0 1px 2px #000}
+button,a.btn{background:var(--panel);color:var(--ink);border:1px solid #2b4a7e;border-radius:4px;padding:5px 10px;font:inherit;cursor:pointer;text-decoration:none}
+#clkL{color:var(--ink);font-size:14px}#clkt{width:4.6em;text-align:center;background:var(--panel);color:var(--ink);border:1px solid #2b4a7e;border-radius:4px;padding:5px 4px;font:inherit}.dim{opacity:.45}
+select{background:var(--panel);color:var(--ink);border:1px solid #2b4a7e;border-radius:4px;padding:5px 8px;font:inherit}
+button:hover,a.btn:hover{border-color:var(--accent)}
+button.on{background:#1f4a86;border-color:var(--accent)}
+#info{display:none;position:fixed;left:12px;bottom:12px;z-index:2;background:#0a1730dd;border:1px solid #2b4a7e;border-radius:6px;padding:8px 12px;font-size:13px;max-width:min(520px,92vw)}
+#info b{color:var(--accent);font-weight:500}
+#msg{position:fixed;left:0;right:0;top:50%;text-align:center;z-index:1;color:var(--dim);pointer-events:none}
+#fade{position:fixed;inset:0;background:#000;z-index:1;pointer-events:none;opacity:1;transition:opacity 1.4s ease-out}
+</style></head><body>
+<canvas id="view"></canvas>
+<div id="bar">
+  <div class="plate">DESIGN VIEW 3D</div>
+  <a class="btn" id="edit" href="designer.html" title="Open this build in the designer">Open in designer</a>
+  <select id="port" title="Put the ship in one of the eight ports (the floating dock, DOCK00-07)"><option value="0">Port: none</option><option value="1">Port 1</option><option value="2">Port 2</option><option value="3">Port 3</option><option value="4">Port 4</option><option value="5">Port 5</option><option value="6">Port 6</option><option value="7">Port 7</option><option value="8">Port 8</option></select>
+  <label id="clkL" title="Time of day in a port. The sky, fog, sea colour, light level and lamps follow the game's own clock data (as on the drydock page)">Time <select id="clkh"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option selected>12</option></select><select id="clkap"><option>AM</option><option selected>PM</option></select></label>
+  <select id="wth" title="The game's 13 weathers (DAT 2)"><option value="0">Clear</option><option value="1">Clear (variant)</option><option value="2">Light cloud</option><option value="3">Overcast</option><option value="4">Overcast and lightning</option><option value="5">Light rain</option><option value="6">Rain</option><option value="7">Heavy rain and lightning</option><option value="8">Light mist</option><option value="9">Mist</option><option value="10">Thick mist</option><option value="11">Snow</option><option value="12">Heavy snow</option></select>
+  <button id="bLights" title="Lamp glows and light beams of the port's lights (off by day)">Lights</button>
+  <button id="bTop"title="Look straight down">Top</button>
+  <button id="bSide" title="Look from the side">Side</button>
+  <button id="bChase" title="Follow a flying aircraft over its shoulder (drag: swing round it, wheel: distance). Needs aircraft in the design">Chase cam</button>
+  <label id="briL" title="Brightness of the whole picture: sky, sea, port, props, ship, parts and aircraft" style="color:var(--ink);font-size:14px">Brightness <input id="bri" type="range" min="0.5" max="2" step="0.05" value="1" style="vertical-align:middle;width:110px"></label>
+  <button id="bShot"title="Save the view as a PNG picture">Screenshot</button>
+  <button id="bReset" title="Reset the camera">Reset camera</button>
+</div>
+<div id="fade"></div>
+<div id="msg">Loading...</div>
+<div id="info"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="water.js"></script>
+<script>
+(function () {
+  'use strict';
+  /* 3D view of a design from its share link (designer.html: #z... / #b... / #d<n>). Everything comes from the game's own data:
+     grid -> world: the design grid is 160 cells long with the ship centred (the hull picture's grid; hull length L cells), bow towards +x; plan y 26 = the centre line; level = row from the top of the side area.
+     One cell = hull model length / hull length L in model units (so parts, built at the game's scale, keep their size). Part: the plan picture's shape box (the turret ring / magazine footprint) is where the model's
+     origin goes; the facing comes from the picture's rotation (b13 aft, b14 side bytes); the turret body (above its ring) sits on the row level + side box top; engines are drawn as boxes (no model). */
+  var D = null, SH = null, HZ = null, IDX = {}, $ = function (id) { return document.getElementById(id); };
+  var canvas = $('view'), renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, preserveDrawingBuffer: true }), DECK_CLIP = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); renderer.localClippingEnabled = true;
+  var scene = new THREE.Scene(); scene.background = new THREE.Color(0x07142b);
+  var cam = new THREE.PerspectiveCamera(40, 1, 10, 200000), root = new THREE.Group(); scene.add(root);
+  var amb0 = new THREE.AmbientLight(0xffffff, 0.75); scene.add(amb0); var sun = new THREE.DirectionalLight(0xffffff, 0.8); sun.position.set(-3000, 6000, 2500); scene.add(sun);
+  var hullGroup = new THREE.Group(), partGroup = new THREE.Group(), boxGroup = new THREE.Group(); root.add(hullGroup, partGroup, boxGroup);
+  var cur = null, orbit = { az: -0.7, el: 0.5, dist: 8000, target: new THREE.Vector3() };
+  /* fade in from black: the scene arrives in stages (hull and parts, then the sea once water.js is loaded, then the dock and its props), each one popping in. The black cover is lifted once the first build, the sea and the port (if one is chosen) are all in place; 8 s at most, in case one of them fails */
+  var shown = false, buildDone = false, waterFailed = false;
+  function reveal(force) {
+    if (shown) return;
+    if (!force && !(buildDone && (!dockN || dockGroup.userData.ready) && (!waterOn || waterObj || waterFailed || !window.WGWater))) return;
+    shown = true; render(); requestAnimationFrame(function () { requestAnimationFrame(function () { $('fade').style.opacity = '0'; }); });
+  }
+  setTimeout(function () { reveal(true); }, 8000);
+
+  // ---- link (same format as designer.html) ----
+  function b64d(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; var t = atob(s), b = new Uint8Array(t.length); for (var i = 0; i < t.length; i++) b[i] = t.charCodeAt(i); return b; }
+  async function inflate(b) { return new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer()); }
+  function unpack(b) {
+    var v = new DataView(b.buffer, b.byteOffset, b.byteLength), n = b[9], ms = []; if (b[0] !== 1 && b[0] !== 2) throw new Error('unknown link version');
+    for (var i = 0; i < n; i++) {
+      if (b[0] === 2) { var g = function (c) { return b[10 + c * n + i]; }; ms.push([(g(0) << 8) | g(1), g(2), g(3), g(4), g(5) | (g(6) << 8), g(7), g(8), g(9), g(10)]); }      // version 2: by column
+      else { var o = 10 + 11 * i; ms.push([v.getUint16(o), b[o + 2], b[o + 3], b[o + 4], b[o + 5] | (b[o + 6] << 8), b[o + 7], b[o + 8], b[o + 9], b[o + 10]]); }
+    }
+    var air = [], tb = 10 + 11 * n + 21; if (b.length >= tb + 41) for (var k = 0; k < 7; k++) { var o2 = tb + 20 + 3 * k, r1 = v.getUint16(o2); if (r1) air.push([r1 - 1, b[o2 + 2] & 127, b[o2 + 2] >> 7, k]); }      // the aircraft slots (record index + 1, count, wing B)
+    return { hull: v.getUint16(1), armor: b[3], mounts: ms, air: air };
+  }
+  function applyScene(sc) {      // a preset can bind the setting too: port, time (hour + AM / PM) and weather (index into the game's 13)
+    if (sc.port != null) { dockN = +sc.port; $('port').value = String(dockN); try { localStorage.setItem('wg2.designer3d.port', dockN); } catch (e) {} dockGroup.userData.base = null; }
+    if (sc.hour != null) { $('clkh').value = String(sc.hour); $('clkap').value = sc.ampm === 'PM' ? 'PM' : 'AM'; clkMin = ((+sc.hour % 12) + (sc.ampm === 'PM' ? 12 : 0)) * 60; }
+    if (sc.weather != null) $('wth').value = String(sc.weather);
+    tw = null; if (typeof applyClock === 'function') applyClock();
+  }
+  async function readHash() {
+    var h = location.hash.replace(/^#/, ''), m;
+    if (/^[A-Za-z][A-Za-z0-9_-]*$/.test(h) && !/^[bz][A-Za-z0-9_-]{30,}$/.test(h)) { try { var PR = await (await fetch('presets.json', { cache: 'no-cache' })).json(), key = Object.keys(PR).filter(function (k) { return k.toLowerCase() === h.toLowerCase(); })[0]; if (key) { h = PR[key].link; if (PR[key].scene) applyScene(PR[key].scene); } } catch (e) {} }      // a built-in preset by name (web/presets.json), e.g. #SupercarrierDemo
+    if ((m = /^d(\d+)$/.exec(h))) { var ds = D.designs[+m[1]]; return { hull: ds.hull, armor: ds.armor, mounts: ds.mounts, name: ds.name, air: ds.air.map(function (a, i) { return [a[0], a[1], a[2], i]; }).filter(function (a) { return a[0] >= 0; }) }; }
+    if ((m = /^h(\d+)a(\d+)~(.*)$/.exec(h))) return { hull: +m[1], armor: +m[2], mounts: m[3] ? m[3].split('_').map(function (s) { return s.split('.').map(Number); }) : [] };
+    if (/^[bz][A-Za-z0-9_-]+$/.test(h)) { var b = b64d(h.slice(1)); if (h[0] === 'z') b = await inflate(b); return unpack(b); }
+    var ds2 = D.designs[484]; return { hull: ds2.hull, armor: ds2.armor, mounts: ds2.mounts, name: ds2.name };      // nothing in the link: the Yamato Type blueprint
+  }
+
+  // ---- shapes (designer_sprites/index.json) ----
+  function shape(i) { var p = SH.pictures[i]; if (!p) return null; var m = p.margins; return { w: p.fw, h: p.fh, x0: m[0], y0: m[1], bw: m[2], bh: m[3] }; }
+  function rotBox(s, rot, flag) {
+    var w = s.w, h = s.h, x0 = s.x0, y0 = s.y0, bw = s.bw, bh = s.bh, t;
+    if (rot === 1) t = [h, w, h - (y0 + bh), x0, bh, bw]; else if (rot === 2) t = [w, h, w - (x0 + bw), h - (y0 + bh), bw, bh]; else if (rot === 3) t = [h, w, y0, w - (x0 + bw), bh, bw]; else t = [w, h, x0, y0, bw, bh];
+    w = t[0]; h = t[1]; x0 = t[2]; y0 = t[3]; bw = t[4]; bh = t[5]; if (flag & 1) y0 = h - (y0 + bh); if (flag & 2) x0 = w - (x0 + bw);
+    return { w: w, h: h, x0: x0, y0: y0, bw: bw, bh: bh };
+  }
+  function facing(b13, b14) { if (b13) return [2, 0]; if (b14 === 1) return [0, 1]; if (b14 === 2) return [3, 0]; return [b14 === 3 ? 1 : 0, 0]; }
+
+  // ---- models ----
+  var modelCache = {}, texCache = {};
+  // Smooth shading (on by default; same setting as the model viewer, key wg2.models.smooth): triangles that meet at a point share an averaged normal when their faces are within 55 degrees, so curves look round and hard edges stay hard
+  var smooth = true;      // always on here (no button; the model viewer's own setting is not used)
+  function smoothNormals(g) {
+    var P = g.attributes.position.array, nt = P.length / 9, fn = new Float32Array(nt * 3), key = new Array(nt * 3), at = new Map(), cosT = Math.cos(55 * Math.PI / 180), t, c, o;
+    for (t = 0; t < nt; t++) {
+      o = t * 9; var ux = P[o + 3] - P[o], uy = P[o + 4] - P[o + 1], uz = P[o + 5] - P[o + 2], vx = P[o + 6] - P[o], vy = P[o + 7] - P[o + 1], vz = P[o + 8] - P[o + 2];
+      var x = uy * vz - uz * vy, y = uz * vx - ux * vz, z = ux * vy - uy * vx, l = Math.hypot(x, y, z) || 1; fn[t * 3] = x / l; fn[t * 3 + 1] = y / l; fn[t * 3 + 2] = z / l;
+      for (c = 0; c < 3; c++) { var k = Math.round(P[o + c * 3] * 4) + ',' + Math.round(P[o + c * 3 + 1] * 4) + ',' + Math.round(P[o + c * 3 + 2] * 4); key[t * 3 + c] = k; var arr = at.get(k); if (!arr) at.set(k, arr = []); arr.push(t); }
+    }
+    var N = new Float32Array(P.length);
+    for (t = 0; t < nt; t++) for (c = 0; c < 3; c++) {
+      var sx = 0, sy = 0, sz = 0, a = t * 3, list = at.get(key[t * 3 + c]);
+      for (var q = 0; q < list.length; q++) { var b = list[q] * 3; if (fn[a] * fn[b] + fn[a + 1] * fn[b + 1] + fn[a + 2] * fn[b + 2] >= cosT) { sx += fn[b]; sy += fn[b + 1]; sz += fn[b + 2]; } }
+      var ln = Math.hypot(sx, sy, sz) || 1; o = t * 9 + c * 3; N[o] = sx / ln; N[o + 1] = sy / ln; N[o + 2] = sz / ln;
+    }
+    g.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+  }
+  function tex(id) {
+    if (!texCache[id]) texCache[id] = new Promise(function (res) { new THREE.TextureLoader().load('models/' + id + '.png', function (t) { t.flipY = false; t.wrapS = t.wrapT = THREE.RepeatWrapping; res(t); }, undefined, function () { res(null); }); });
+    return texCache[id];
+  }
+  var BLD_GLOW = 0.5;      // strength of the lit windows of the port's buildings (1 = full: too bright as solid panels, user; 0.12 made them vanish)
+  var keyCache = {};
+  function texKey(id) {      // the same texture with its black made transparent (colour key: the port props' black patches are not paint, they are meant to be see-through; user)
+    if (!keyCache[id]) keyCache[id] = new Promise(function (res) {
+      var im = new Image(); im.onload = function () {
+        var c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; var g = c.getContext('2d'); g.drawImage(im, 0, 0);
+        try { var d = g.getImageData(0, 0, c.width, c.height), p = d.data; for (var i = 0; i < p.length; i += 4) if (p[i] < 14 && p[i + 1] < 14 && p[i + 2] < 14) p[i + 3] = 0; g.putImageData(d, 0, 0); } catch (e) { tex(id).then(res); return; }
+        var t = new THREE.CanvasTexture(c); t.flipY = false; t.wrapS = t.wrapT = THREE.RepeatWrapping; res(t);
+      }; im.onerror = function () { res(null); }; im.src = 'models/' + id + '.png';
+    });
+    return keyCache[id];
+  }
+  function loadModel(id) {
+    if (modelCache[id]) return modelCache[id];
+    return modelCache[id] = (async function () {
+      var m = IDX[id]; if (!m) return null; var buf = await (await fetch('models/' + id + '.bin')).arrayBuffer(), dv = new DataView(buf), off = 0, pos = [], uv = [];
+      var heli = m.cls === 'Helicopter', rotQ = [], bladeQ = [], discQ = [], propQ = [], triQ = [], tailQ0 = [], tailQ1 = [];      // helicopter: slot 1 is the rotor blades (a separate part, rest pose), kept apart so they can spin about their hub
+      m.parts.forEach(function (p) {
+        if (heli && p.slot !== 12 && p.kind === 'mesh') {      /* part 1 = the low-quality in-game copy: only its flat rotor disc is kept (it spins); the rest is left out. Part 0 = the high-quality model: its separate blades are left out (the disc replaces them), the rest is the body */
+          var qo1 = off + p.v * 12, uo1 = qo1 + p.q * 8, par = [], fnd = function (a) { while (par[a] !== a) a = par[a] = par[par[a]]; return a; }, k1, j1;
+          for (k1 = 0; k1 < p.v; k1++) par[k1] = k1;
+          for (k1 = 0; k1 < p.q; k1++) for (j1 = 1; j1 < 4; j1++) { var qa = fnd(dv.getUint16(qo1 + (k1 * 4) * 2, true)), qb = fnd(dv.getUint16(qo1 + (k1 * 4 + j1) * 2, true)); if (qa !== qb) par[qa] = qb; }      // quads that share vertices = one rotor
+          var cl = {};
+          for (k1 = 0; k1 < p.q; k1++) {
+            var r4 = [0, 1, 2, 3].map(function (j) { return dv.getUint16(qo1 + (k1 * 4 + j) * 2, true); }), key1 = fnd(r4[0]), C1 = cl[key1] || (cl[key1] = { pos: [], uv: [] });
+            (r4[2] === r4[3] ? [[0, 1, 2]] : [[0, 1, 2], [0, 2, 3]]).forEach(function (t) { t.forEach(function (c) { var vi = r4[c]; C1.pos.push(dv.getFloat32(off + vi * 12, true), dv.getFloat32(off + vi * 12 + 4, true), dv.getFloat32(off + vi * 12 + 8, true)); C1.uv.push(dv.getUint16(uo1 + (k1 * 8 + c * 2) * 2, true) / 16384, dv.getUint16(uo1 + (k1 * 8 + c * 2 + 1) * 2, true) / 16384); }); });
+          }
+          Object.keys(cl).forEach(function (kk) {      // a rotor = a flat (no height), roughly square disc quad of more than 1000 units: spins; everything else (tail rotor, fuselage, sub-parts) stays static
+            var C2 = cl[kk], lo2 = [1e9, 1e9, 1e9], hi2 = [-1e9, -1e9, -1e9], i3, a3;
+            for (i3 = 0; i3 < C2.pos.length; i3 += 3) for (a3 = 0; a3 < 3; a3++) { if (C2.pos[i3 + a3] < lo2[a3]) lo2[a3] = C2.pos[i3 + a3]; if (C2.pos[i3 + a3] > hi2[a3]) hi2[a3] = C2.pos[i3 + a3]; }
+            var ex = hi2[0] - lo2[0], ey = hi2[1] - lo2[1], ez = hi2[2] - lo2[2];
+            var cyc = (lo2[1] + hi2[1]) / 2;            var tn = null; if (C2.pos.length >= 9) { var e1 = [C2.pos[3] - C2.pos[0], C2.pos[4] - C2.pos[1], C2.pos[5] - C2.pos[2]], e2 = [C2.pos[6] - C2.pos[0], C2.pos[7] - C2.pos[1], C2.pos[8] - C2.pos[2]], nn = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]], nl = Math.sqrt(nn[0] * nn[0] + nn[1] * nn[1] + nn[2] * nn[2]); if (nl > 0) tn = [nn[0] / nl, nn[1] / nl, nn[2] / nl]; }      // the disc's plane normal (the Black Hawk's tail rotor is canted about 15 degrees, so it is not exactly flat in x)
+            var tmin = p.slot > 0 ? 250 : 180;      // the Comanche's ducted fan (216 units, part 0) is smaller than the others' tail rotors
+            if (tn && Math.abs(tn[0]) > 0.9 && ey > tmin && ey < 700 && ez > tmin && ez < 700 && Math.abs(ey - ez) < 0.2 * Math.max(ey, ez) && C2.pos.length <= 54 && Math.abs(cyc) > 700) (p.slot > 0 ? tailQ1 : tailQ0).push({ pos: C2.pos, uv: C2.uv, cx: (lo2[0] + hi2[0]) / 2, cy: cyc, cz: (lo2[2] + hi2[2]) / 2, n: tn });      /* the tail rotor: a flat, nearly round disc far forward or aft of the middle, side-mounted (flat in x): it spins about x; from part 0 where there is one, else from the low-poly copy */
+            else if (p.slot > 0) { if (ez < 2 && ex > 1000 && ey > 1000 && Math.abs(ex - ey) < 0.15 * Math.max(ex, ey)) rotQ.push(C2); }      /* the low-poly copy: only the rotor disc (a flat, roughly square quad) is used */
+            else if (ez < 2 && Math.max(ex, ey) > 600 && C2.pos.length <= 144) bladeQ.push({ pos: C2.pos, uv: C2.uv, cx: (lo2[0] + hi2[0]) / 2, cy: (lo2[1] + hi2[1]) / 2, cz: (lo2[2] + hi2[2]) / 2 }); else {      /* a rotor blade: a flat quad (or two) more than 1000 units long; the blades of one rotor (same height) turn together about their common centre */ for (i3 = 0; i3 < C2.pos.length; i3++) pos.push(C2.pos[i3]); for (i3 = 0; i3 < C2.uv.length; i3++) uv.push(C2.uv[i3]); }
+          });
+        } else if (!heli && m.cat === 'aircraft' && p.slot > 0 && p.slot !== 12 && p.kind === 'mesh') {      /* other aircraft with rotors or propellers (the Pogo's contra-rotating props, the Triebflugel's rotors, flying boats' props): from the low-poly copy only its big flat discs facing forward (flat in y, 250+ units across, nearly round) are kept, to spin about the model's y axis; the rest of the copy is left out */
+          var qo2 = off + p.v * 12, uo2 = qo2 + p.q * 8, par2 = [], fnd2 = function (a) { while (par2[a] !== a) a = par2[a] = par2[par2[a]]; return a; }, kk, jj;
+          for (kk = 0; kk < p.v; kk++) par2[kk] = kk;
+          for (kk = 0; kk < p.q; kk++) { var qq = [0, 1, 2, 3].map(function (j) { return dv.getUint16(qo2 + (kk * 4 + j) * 2, true); }); if (Math.max.apply(null, qq) >= p.v) continue; for (jj = 1; jj < 4; jj++) { var ra = fnd2(qq[0]), rb = fnd2(qq[jj]); if (ra !== rb) par2[ra] = rb; } }
+          var cl2 = {};
+          for (kk = 0; kk < p.q; kk++) {
+            var r42 = [0, 1, 2, 3].map(function (j) { return dv.getUint16(qo2 + (kk * 4 + j) * 2, true); }); if (Math.max.apply(null, r42) >= p.v) continue; var key2 = fnd2(r42[0]), C3 = cl2[key2] || (cl2[key2] = { pos: [], uv: [] });
+            (r42[2] === r42[3] ? [[0, 1, 2]] : [[0, 1, 2], [0, 2, 3]]).forEach(function (t) { t.forEach(function (c) { var vi = r42[c]; C3.pos.push(dv.getFloat32(off + vi * 12, true), dv.getFloat32(off + vi * 12 + 4, true), dv.getFloat32(off + vi * 12 + 8, true)); C3.uv.push(dv.getUint16(uo2 + (kk * 8 + c * 2) * 2, true) / 16384, dv.getUint16(uo2 + (kk * 8 + c * 2 + 1) * 2, true) / 16384); }); });
+          }
+          Object.keys(cl2).forEach(function (kc) {
+            var C3 = cl2[kc], lo3 = [1e9, 1e9, 1e9], hi3 = [-1e9, -1e9, -1e9], i4, a4; for (i4 = 0; i4 < C3.pos.length; i4 += 3) for (a4 = 0; a4 < 3; a4++) { if (C3.pos[i4 + a4] < lo3[a4]) lo3[a4] = C3.pos[i4 + a4]; if (C3.pos[i4 + a4] > hi3[a4]) hi3[a4] = C3.pos[i4 + a4]; }
+            var ex3 = hi3[0] - lo3[0], ey3 = hi3[1] - lo3[1], ez3 = hi3[2] - lo3[2];
+            if (ey3 < 2 && ex3 > 250 && ez3 > 250 && Math.abs(ex3 - ez3) < 0.03 * Math.max(ex3, ez3) && C3.pos.length <= 54) discQ.push({ pos: C3.pos, uv: C3.uv, cx: (lo3[0] + hi3[0]) / 2, cy: (lo3[1] + hi3[1]) / 2, cz: (lo3[2] + hi3[2]) / 2 });
+          });
+        } else if (p.kind === 'mesh' && p.slot !== 12 && !(m.cat === 'aircraft' && p.slot > 0)) {      /* an aircraft model's part 1 is a second, low-quality copy of the plane (55 vertices against 530); drawn together with part 0 it overlaps it (z-fighting, roundels in the wrong places): the Models page shows part 0 only (helicopters keep their rotor part, handled above) */
+          var qo = off + p.v * 12, uo = qo + p.q * 8;
+          for (var k = 0; k < p.q; k++) {
+            var q4 = [0, 1, 2, 3].map(function (j) { return dv.getUint16(qo + (k * 4 + j) * 2, true); });
+            var qp = [], qu = [];
+            (q4[2] === q4[3] ? [[0, 1, 2]] : [[0, 1, 2], [0, 2, 3]]).forEach(function (t) { t.forEach(function (c) { var vi = q4[c]; qp.push(dv.getFloat32(off + vi * 12, true), dv.getFloat32(off + vi * 12 + 4, true), dv.getFloat32(off + vi * 12 + 8, true)); qu.push(dv.getUint16(uo + (k * 8 + c * 2) * 2, true) / 16384, dv.getUint16(uo + (k * 8 + c * 2 + 1) * 2, true) / 16384); }); });
+            var qy0 = qp[1], qflat = true, qxl = 1e9, qxh = -1e9, qzl = 1e9, qzh = -1e9, qi; for (qi = 0; qi < qp.length; qi += 3) { if (Math.abs(qp[qi + 1] - qy0) > 2) qflat = false; qxl = Math.min(qxl, qp[qi]); qxh = Math.max(qxh, qp[qi]); qzl = Math.min(qzl, qp[qi + 2]); qzh = Math.max(qzh, qp[qi + 2]); }
+            var qry = 0; for (qi = 0; qi < qp.length; qi += 3) qry = Math.max(qry, Math.abs(qp[qi + 1])); var qcx = (qxl + qxh) / 2, qcz = (qzl + qzh) / 2;
+            if (id === 'chr_965' && p.slot === 0 && qry <= 160 && Math.hypot(qcx, qcz) > 160) triQ.push({ pos: qp, uv: qu });      /* Triebfluegel: the whole rotor (its three arms with their blades and engines, all within 160 units of the y = 0 plane and away from the hub) turns together about the model's y axis */
+            else if (!heli && m.cat === 'aircraft' && qflat && Math.max(qxh - qxl, qzh - qzl) > 150) propQ.push({ y: qy0, pos: qp, uv: qu });      // a flat forward-facing quad (a propeller blade of the high-poly model): kept only if no low-poly blur disc replaces it, see below
+            else { for (qi = 0; qi < qp.length; qi++) pos.push(qp[qi]); for (qi = 0; qi < qu.length; qi++) uv.push(qu[qi]); }
+          }
+        }
+        off += p.v * 12 + p.q * 24;
+      });
+      if (triQ.length) { var TR = { pos: [], uv: [], c: [0, 0, 0], axis: 'y' }; triQ.forEach(function (b) { b.pos.forEach(function (v) { TR.pos.push(v); }); b.uv.forEach(function (v) { TR.uv.push(v); }); }); rotQ.push(TR); }
+      var tgp = {}; tailQ0.forEach(function (b) { var kd = Math.round(b.cx / 80) + ',' + Math.round(b.cy / 80) + ',' + Math.round(b.cz / 80); (tgp[kd] || (tgp[kd] = [])).push(b); });
+      Object.keys(tgp).forEach(function (kd) { var L = tgp[kd], R = { pos: [], uv: [], c: [L[0].cx, L[0].cy, L[0].cz], axis: 'x', n: L[0].n }; L.forEach(function (b) { b.pos.forEach(function (v) { R.pos.push(v); }); b.uv.forEach(function (v) { R.uv.push(v); }); }); rotQ.push(R); });
+      var dgp = {}; discQ.forEach(function (b) { var kd = Math.round(b.cx / 30) + ',' + Math.round(b.cy / 30) + ',' + Math.round(b.cz / 30); (dgp[kd] || (dgp[kd] = [])).push(b); });      // the two faces of one disc share a centre: one spinning piece
+      Object.keys(dgp).forEach(function (kd) { var L = dgp[kd], R = { pos: [], uv: [], c: [L[0].cx, L[0].cy, L[0].cz], axis: 'y' }; L.forEach(function (b) { b.pos.forEach(function (v) { R.pos.push(v); }); b.uv.forEach(function (v) { R.uv.push(v); }); }); R.disc = true; rotQ.push(R); });
+      var addStatic = function (b) { b.pos.forEach(function (v) { pos.push(v); }); b.uv.forEach(function (v) { uv.push(v); }); }, ctr = function (b) { var l = [1e9, 1e9, 1e9], h = [-1e9, -1e9, -1e9], i5, a5; for (i5 = 0; i5 < b.pos.length; i5 += 3) for (a5 = 0; a5 < 3; a5++) { if (b.pos[i5 + a5] < l[a5]) l[a5] = b.pos[i5 + a5]; if (b.pos[i5 + a5] > h[a5]) h[a5] = b.pos[i5 + a5]; } return [(l[0] + h[0]) / 2, (l[1] + h[1]) / 2, (l[2] + h[2]) / 2]; };
+      /* the high-poly rotor blades / propeller blades (part 0) are what spins; the low-poly blur disc (part 1) only gives the hub, the axis and the level. Blades are assigned to the nearest disc at their level; without a disc (or with too few blades) they stay still as part of the body, the disc spins as before */
+      var mainD = rotQ.filter(function (r) { return !r.c; }).map(function (d) { var c0 = ctr(d); if (Math.abs(c0[0]) < 200 && Math.abs(c0[1]) < 200) { c0[0] = 0; c0[1] = 0; } return { r: d, c: c0, bl: [] }; });      // helicopter main discs (flat in z); a lopsided one (the AH-1's) is centred on its mast
+      var rgp = {}; bladeQ.forEach(function (b) { var kz = Math.round(b.cz / 80); (rgp[kz] || (rgp[kz] = [])).push(b); });      // blades grouped by height
+      Object.keys(rgp).forEach(function (kz) { var L = rgp[kz]; if (L.length < 3) { L.forEach(addStatic); return; }      /* fewer than 3 flat pieces at one height are not a rotor: kept as part of the body */
+        L.forEach(function (b) { var best = null, bd = 1e12; mainD.forEach(function (d) { if (Math.abs(d.c[2] - b.cz) > 60) return; var dd = Math.hypot(d.c[0] - b.cx, d.c[1] - b.cy); if (dd < bd) { bd = dd; best = d; } }); if (best) best.bl.push(b); else addStatic(b); }); });
+      mainD.forEach(function (d) { if (d.bl.length >= 3) { d.r.pos = []; d.r.uv = []; d.bl.forEach(function (b) { b.pos.forEach(function (v) { d.r.pos.push(v); }); b.uv.forEach(function (v) { d.r.uv.push(v); }); }); d.r.c = d.c; d.r.axis = 'z'; } else { d.bl.forEach(addStatic); d.r.drop = true; } });      // no high-poly blades for this disc: it is not drawn (low-poly rotors never render)
+      var propD = rotQ.filter(function (r) { return r.disc && r.axis === 'y'; });      // propeller discs (flat in y)
+      propQ.forEach(function (b) { var c1 = ctr(b), best = null, bd = 1e12; propD.forEach(function (d) { if (Math.abs(d.c[1] - b.y) > 40) return; var dd = Math.hypot(d.c[0] - c1[0], d.c[2] - c1[2]); if (dd < bd) { bd = dd; best = d; } }); if (best) (best.bl || (best.bl = [])).push(b); else addStatic(b); });
+      propD.forEach(function (d) { if (d.bl && d.bl.length) { d.pos = []; d.uv = []; d.bl.forEach(function (b) { b.pos.forEach(function (v) { d.pos.push(v); }); b.uv.forEach(function (v) { d.uv.push(v); }); }); } else d.drop = true; });
+      rotQ = rotQ.filter(function (r) { return !r.drop; });
+      var mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9], rz = {}, i;
+      for (i = 0; i < pos.length; i += 3) { for (var a = 0; a < 3; a++) { if (pos[i + a] < mn[a]) mn[a] = pos[i + a]; if (pos[i + a] > mx[a]) mx[a] = pos[i + a]; } var k = Math.round(pos[i + 2]), r = Math.sqrt(pos[i] * pos[i] + pos[i + 1] * pos[i + 1]); if (!(k in rz) || r > rz[k]) rz[k] = r; }
+      var lv = Object.keys(rz).map(Number).sort(function (a, b) { return a - b; }), ring = mn[2];      // turret ring: the first height where the radius grows more than 20% over the lowest level
+      if (lv.length > 2) { var r0 = rz[lv[0]]; for (i = 1; i < lv.length; i++) if (rz[lv[i]] > 1.2 * r0) { ring = lv[i]; break; } }
+      if (ring - mn[2] > (mx[2] - mn[2]) * 0.8) ring = mn[2];
+      var g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); if (smooth) smoothNormals(g); else g.computeVertexNormals();
+      var t = m.tex != null ? await tex(id) : null;
+      var rots = rotQ.map(function (C1) {      // each rotor: its geometry and its hub (the middle of its plan extent, at its mid height)
+        var rg = new THREE.BufferGeometry(), lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+        if (!C1.c) { var sx = 0, sy = 0, sn = C1.pos.length / 3, si; for (si = 0; si < C1.pos.length; si += 3) { sx += C1.pos[si]; sy += C1.pos[si + 1]; } sx /= sn; sy /= sn; if (Math.abs(sx) < 200 && Math.abs(sy) < 200) for (si = 0; si < C1.pos.length; si += 3) { C1.pos[si] -= sx; C1.pos[si + 1] -= sy; } }      // a main rotor disc that is a little off its mast (the AH-1's quad runs from -1617 to 1372): centred on the mast (the model origin)
+        rg.setAttribute('position', new THREE.Float32BufferAttribute(C1.pos, 3)); rg.setAttribute('uv', new THREE.Float32BufferAttribute(C1.uv, 2)); if (smooth) smoothNormals(rg); else rg.computeVertexNormals();
+        for (var i2 = 0; i2 < C1.pos.length; i2 += 3) for (var a2 = 0; a2 < 3; a2++) { if (C1.pos[i2 + a2] < lo[a2]) lo[a2] = C1.pos[i2 + a2]; if (C1.pos[i2 + a2] > hi[a2]) hi[a2] = C1.pos[i2 + a2]; }
+        return { g: rg, axis: C1.axis || 'z', n: C1.n, c: C1.c || [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2] };
+      });
+      var rotD = 0; rots.forEach(function (r) { r.g.computeBoundingBox(); var b = r.g.boundingBox; rotD = Math.max(rotD, b.max.x - b.min.x, b.max.y - b.min.y); });
+      return { g: g, tex: t, mn: mn, mx: mx, ring: ring, rots: rots, rotD: rotD, heli: heli };
+    })();
+  }
+  function material(mo, color) { return new THREE.MeshStandardMaterial({ color: mo.tex ? 0xffffff : (color || 0x8fb4d8), map: mo.tex, metalness: 0.05, roughness: 0.85, side: THREE.DoubleSide, transparent: !!mo.tex, alphaTest: mo.tex ? 0.4 : 0 }); }
+
+  var SIDE_PUSH_MSL = 0.15;      // the carrier missile launchers sit further out than the CIWS / guns (user: 0.35 moved them in too much)
+  var SIDE_PUSH = 0.35;      // fraction of a side mount's width that sinks into the hull (an estimate from the user's in-game screenshots)
+  // the model-space deck height (z of the deck above the waterline) of a hull, by the same fit build() uses (copy of that code; used to calibrate the dock against the Supercarrier, whose height with the dock the user confirmed)
+  async function deckZOf(H) {
+    var gW = 0, gc0 = 999, gc1 = -1; HZ.hulls[H.pic].grid.forEach(function (runs) { runs.forEach(function (a) { if (a[0]) { gc0 = Math.min(gc0, a[1]); gc1 = Math.max(gc1, a[1] + a[2] - 1); } }); }); gW = gc1 - gc0 + 1;
+    var hm = await loadModel(H.model), len = hm.mx[1] - hm.mn[1], s = len / (gW > 0 ? gW : H.L), seen = {}, tops = [];
+    HZ.hulls[H.pic].grid.forEach(function (runs, r) { if (r > 32) return; runs.forEach(function (a) { if (a[0]) for (var k = 0; k < a[2]; k++) { var c = a[1] + k; if (!(c in seen)) { seen[c] = 1; tops.push(r); } } }); });
+    tops.sort(function (a, b) { return a - b; }); var deckRow = tops.length ? tops[Math.floor(tops.length / 2)] : 25, pa = hm.g.attributes.position.array, ar = {}, deckZ = hm.mx[2];
+    for (var i = 0; i < pa.length; i += 9) {
+      var ux = pa[i + 3] - pa[i], uy = pa[i + 4] - pa[i + 1], uz = pa[i + 5] - pa[i + 2], wx = pa[i + 6] - pa[i], wy = pa[i + 7] - pa[i + 1], wz = pa[i + 8] - pa[i + 2], nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx, nl = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+      if (Math.abs(nz) / nl > 0.95 && pa[i + 2] > hm.mn[2] + (hm.mx[2] - hm.mn[2]) * 0.4) { var k2 = Math.round(pa[i + 2] / 15) * 15; ar[k2] = (ar[k2] || 0) + nl; }
+    } var best = 0; Object.keys(ar).forEach(function (k3) { if (ar[k3] > best) { best = ar[k3]; deckZ = +k3; } });
+    var mcy = (hm.mn[1] + hm.mx[1]) / 2, topRowAt = {}; HZ.hulls[H.pic].grid.forEach(function (runs, r) { if (r > 32) return; runs.forEach(function (a) { if (a[0]) for (var k = 0; k < a[2]; k++) { var c = a[1] + k; if (!(c in topRowAt)) topRowAt[c] = r; } }); });
+    var zmaxAt = {}; for (var vi = 0; vi < pa.length; vi += 3) { var cc = Math.round((mcy - pa[vi + 1]) / s + 80 - 0.5); if (!(cc in zmaxAt) || pa[vi + 2] > zmaxAt[cc]) zmaxAt[cc] = pa[vi + 2]; }
+    var offs = []; Object.keys(topRowAt).forEach(function (c) { if (c in zmaxAt && c > 8 && c < 152) offs.push(zmaxAt[c] - (deckRow - topRowAt[c]) * s); });
+    if (offs.length > 20) { offs.sort(function (a, b) { return a - b; }); var fz = offs[Math.floor(offs.length / 2)], cl = Object.keys(ar).map(function (k) { return [+k, ar[k] / best]; }).filter(function (c) { return c[1] >= 0.25; }), bz = deckZ; cl.forEach(function (c) { if (Math.abs(c[0] - fz) < Math.abs(bz - fz)) bz = c[0]; }); deckZ = bz; }
+    return deckZ;
+  }
+  var cvDeckZ = null;
+  // ---- build the scene ----
+  function clear(g) { while (g.children.length) { var c = g.children.pop(); if (c.material) c.material.dispose(); } }
+  async function build() {      // (deck row: the median over columns of the first hull row in the side area of the zone grid)
+    var d = cur, H = D.hulls[d.hull]; if (!H) throw new Error('unknown hull ' + d.hull);
+    clear(hullGroup); clear(partGroup); clear(boxGroup);
+    var gW = 0, gc0 = 999, gc1 = -1; HZ.hulls[H.pic].grid.forEach(function (runs) { runs.forEach(function (a) { if (a[0]) { gc0 = Math.min(gc0, a[1]); gc1 = Math.max(gc1, a[1] + a[2] - 1); } }); }); gW = gc1 - gc0 + 1;      // the hull's real span in grid columns: H.L (the length the VP uses) is 108 for the frigates whose plan spans 134-138 columns, so scaling by it put parts at the far end beyond the ship (user: frigate AA guns fall off at the maximum position); it equals the span on the Yamato
+    var hm = await loadModel(H.model), len = hm.mx[1] - hm.mn[1], s = len / (gW > 0 ? gW : H.L);      // model units per grid cell
+    var seen = {}, tops = []; HZ.hulls[H.pic].grid.forEach(function (runs, r) { if (r > 32) return; runs.forEach(function (a) { if (a[0]) for (var k = 0; k < a[2]; k++) { var c = a[1] + k; if (!(c in seen)) { seen[c] = 1; tops.push(r); } } }); });
+    tops.sort(function (a, b) { return a - b; }); var deckRow = tops.length ? tops[Math.floor(tops.length / 2)] : 25;
+    // model-space z of the deck: the height with the most upward-facing surface in the upper half of the hull model
+    var pa = hm.g.attributes.position.array, ar = {}, deckZ = hm.mx[2];
+    for (var i = 0; i < pa.length; i += 9) {
+      var ux = pa[i + 3] - pa[i], uy = pa[i + 4] - pa[i + 1], uz = pa[i + 5] - pa[i + 2], wx = pa[i + 6] - pa[i], wy = pa[i + 7] - pa[i + 1], wz = pa[i + 8] - pa[i + 2], nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx, nl = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+      if (Math.abs(nz) / nl > 0.95 && pa[i + 2] > hm.mn[2] + (hm.mx[2] - hm.mn[2]) * 0.4) { var k2 = Math.round(pa[i + 2] / 15) * 15; ar[k2] = (ar[k2] || 0) + nl; }
+    } var best = 0; Object.keys(ar).forEach(function (k3) { if (ar[k3] > best) { best = ar[k3]; deckZ = +k3; } });
+    var mcy = (hm.mn[1] + hm.mx[1]) / 2;
+    // hulls have more than one deck height (forecastle, quarterdeck): fit the model's top height along the ship to the zone grid's top row per column, and take the median offset, instead of trusting the one flattest surface
+    var topRowAt = {}; HZ.hulls[H.pic].grid.forEach(function (runs, r) { if (r > 32) return; runs.forEach(function (a) { if (a[0]) for (var k = 0; k < a[2]; k++) { var c = a[1] + k; if (!(c in topRowAt)) topRowAt[c] = r; } }); });
+    var zmaxAt = {}; for (var vi = 0; vi < pa.length; vi += 3) { var cc = Math.round((mcy - pa[vi + 1]) / s + 80 - 0.5); if (!(cc in zmaxAt) || pa[vi + 2] > zmaxAt[cc]) zmaxAt[cc] = pa[vi + 2]; }
+    var offs = []; Object.keys(topRowAt).forEach(function (c) { if (c in zmaxAt && c > 8 && c < 152) offs.push(zmaxAt[c] - (deckRow - topRowAt[c]) * s); });
+    if (offs.length > 20) { offs.sort(function (a, b) { return a - b; }); var fz = offs[Math.floor(offs.length / 2)], cl = Object.keys(ar).map(function (k) { return [+k, ar[k] / best]; }).filter(function (c) { return c[1] >= 0.25; }), bz = deckZ;
+      cl.forEach(function (c) { if (Math.abs(c[0] - fz) < Math.abs(bz - fz)) bz = c[0]; });      // the deck surface (a large flat upward-facing area of the model) nearest to the fitted height: on a ship with a forecastle that is the main deck, not the larger forecastle roof
+      window.dbgFit = { old: deckZ, fit: fz, chosen: bz }; deckZ = bz; }      // (+0.8 row: the model's highest point per column includes the bulwark / rail above the deck; calibrated so the Yamato, whose look was confirmed in game, keeps its height)
+    // hull: model (x, y, z) -> world X = -(y - centre) (the model's bow is -y), Y = z - deckZ, Z = -x
+    var hmesh = new THREE.Mesh(hm.g, material(hm)); hmesh.matrixAutoUpdate = false; hmesh.matrix.set(0, -1, 0, mcy, 0, 0, 1, -deckZ, -1, 0, 0, 0, 0, 0, 0, 1); hullGroup.add(hmesh);
+    // parts
+    var count = 0, nomodel = 0;
+    for (var m of d.mounts) {
+      var p = D.parts[m[0]]; if (!p || !p.mag) continue; var ai = p.mag[m[5]], bi = p.pic[(m[4] >> 8)]; var sa = shape(ai), sb = shape(bi); if (!sa || !sb) continue;
+      var f = facing(m[6], m[7]), A = rotBox(sa, 0, m[6] ? 2 : 0), B = rotBox(sb, f[0], f[1]), cat = m[4] & 255;
+      var gx = m[1] + B.x0 + B.bw / 2, gz = m[3] + B.y0 + B.bh / 2;      // grid position of the plan shape's box centre (cells; x along the ship, y across)
+      var wx = (gx - 80) * s, wz = (gz - 26) * s, topRow = m[2] + A.y0;
+      var pmodel = (p.bm && p.bm[(m[4] >> 8)]) || p.model;      // the model for this barrel count (1-4 barrels have separate models)
+      if (p.hcls === 24 && (p.flags & 0x80) && (p.family === 'missile' || (p.b4 === 1 && !p.model && p.mag && p.mag[0] === 114))) pmodel = Object.keys(IDX).find(function (k) { return IDX[k].name === 'w_ms_006H'; });      // every carrier side missile launcher (hull class mask 24) is drawn with the one carrier side-mount launcher w_ms_006H: the 2x4 launcher on its tray (user, 2026-11-17; the first attempt used w_ms_002H by a mistake)
+      if (pmodel && IDX[pmodel]) {
+        var mo = await loadModel(pmodel), mesh = new THREE.Mesh(mo.g, material(mo)), th = f[0] * Math.PI / 2, c = Math.cos(th), sn = Math.sin(th), fl = f[1] & 1 ? -1 : 1;
+        var edge = 0;      // a gun turret whose ring overhangs the hull outline (the Yamato's wing turrets) stands one ring (2 rows) lower (user, 2026-11-17)
+        if (p.family === 'main gun' || p.family === 'proto gun') {
+          var gr = HZ.hulls[H.pic].grid, x0c = m[1] + B.x0, x1c = x0c + B.bw, y0c = m[3] + B.y0, y1c = y0c + B.bh;
+          outer: for (var yy = y0c; yy < y1c; yy++) { var runs = gr[33 + yy] || [], row = {}; runs.forEach(function (a) { if (a[0]) for (var q = 0; q < a[2]; q++) row[a[1] + q] = 1; }); for (var xx = x0c; xx < x1c; xx++) if (!row[xx]) { edge = 1; break outer; } }
+        }
+        var yb = (deckRow - m[2] - 2 * edge) * s - mo.mx[2];      // the model's top is at the top row of the side picture (= the level): a part drawn one ring higher in the picture (B turret: level 19 against 21) stands one ring higher; the AA mounts' hex base ends up mostly sunk into the deck, as in the game (user's in-game Yamato photo)
+        if (p.family === 'forward bridge' || p.family === 'aft bridge' || p.family === 'smokestack') yb = (deckRow - (m[2] + A.y0)) * s - mo.ring;      // superstructure stands on the deck: the box top (= the deck row) is where the model's body starts, its base ring sunk below (the top-of-picture rule above left bridges and funnels floating)
+        // model -> world: model y -> -forward (the bow is -y), model x -> lateral (mirrored when flipped), model z -> up; forward = the picture's rotation about the vertical
+        var fwd = new THREE.Vector3(c, 0, sn), side = new THREE.Vector3(-sn, 0, c);
+        var Mx = new THREE.Matrix4(); Mx.makeBasis(side.clone().multiplyScalar(-fl), fwd.clone().multiplyScalar(-1), new THREE.Vector3(0, 1, 0)); Mx.setPosition(wx, yb, wz);
+        if ((p.flags & 0x80) && (!(p.flags & 0x400) || p.hcls === 24)) {      // (0x400 on a part for other hulls = the VLS missile launchers, not side mounts; the carrier-class missile launchers and CIWS (hull class mask 24, flags 0x588) are carrier side mounts)
+          // side mounts (flag 0x80 / 0x188: carrier side AA, side hi-angle guns, side elevator, side searchlight): the picture's box is only the strip that attaches to the hull edge, not the ring, so the model is aligned by its whole footprint instead:
+          // the middle of the model's plan / height extent goes to the middle of the plan picture and of the side picture
+          Mx.setPosition(0, 0, 0); var lo = new THREE.Vector3(1e9, 1e9, 1e9), hi = new THREE.Vector3(-1e9, -1e9, -1e9);
+          for (var ci = 0; ci < 8; ci++) { var cp = new THREE.Vector3(ci & 1 ? mo.mx[0] : mo.mn[0], ci & 2 ? mo.mx[1] : mo.mn[1], ci & 4 ? mo.mx[2] : mo.mn[2]).applyMatrix4(Mx); lo.min(cp); hi.max(cp); }
+          Mx.setPosition((m[1] + B.w / 2 - 80) * s - (lo.x + hi.x) / 2, (deckRow - (m[2] + A.h / 2)) * s - (lo.y + hi.y) / 2, (m[3] + B.h / 2 - 26) * s - (lo.z + hi.z) / 2);
+          if (p.label !== 'side elevator' && p.label !== 'elevator') Mx.setPosition((m[1] + B.w / 2 - 80) * s - (lo.x + hi.x) / 2, (deckRow - (m[2] + A.y0 + A.bh)) * s - lo.y, (m[3] + B.h / 2 - 26) * s - (lo.z + hi.z) / 2 - Math.sign((m[3] + B.h / 2 - 26) || 1) * (p.family === 'missile' ? SIDE_PUSH_MSL : SIDE_PUSH) * (hi.z - lo.z));      /* pushed into the hull by SIDE_PUSH of the model's width towards the centre line (user, in-game screenshots: the sponson sinks into the side of the hull, it is not attached to it) */      /* standard base height for every side weapon (user, from the SSM launcher): the bottom of the model (its tray / sponson) sits on the bottom row of the side picture's box, so a CIWS or AA gun stands on the same base height as the missile launcher (centring by height put the taller CIWS model higher) */
+          // the side elevator is a thin platform: in the game its top surface lies at the top row of its side picture's box (level + box y0, the deck line), not at the middle of the picture's height (user, 2026-11-17: it stands higher in game)
+          if (p.label === 'side elevator') Mx.setPosition((m[1] + B.w / 2 - 80) * s - (lo.x + hi.x) / 2, (deckRow - m[2] - 0.25) * s - hi.y, (m[3] + B.h / 2 - 26) * s - (lo.z + hi.z) / 2);      /* top of the platform almost flush with the deck: the first hull row at its columns is the level, 0.25 row below it (user: still too low with the box top, level + 1) */
+        }
+        else { mesh.material.clippingPlanes = [DECK_CLIP]; }      // everything of an ordinary mount below the main deck is inside the hull: cut it, so the ring / pedestal of a mount at the hull edge cannot poke out through the side
+        mesh.matrixAutoUpdate = false; mesh.matrix.copy(Mx); partGroup.add(mesh); count++;
+      } else if (cat === 10 || cat === 11 || p.label === 'elevator' || (p.family === 'facility' && p.kind === 18)) {      // (the catapult has no model: no box either, user)      // engines, boilers and turbines are inside the hull; the non-side elevator has no model: neither is shown in the 3D view
+        continue;
+      } else {      // no model: a box over the plan footprint, from the row down by the side shape's height
+        var w = A.w * s, hgt = Math.max(A.h, 1) * s, dep = B.h * s, bxm = new THREE.Mesh(new THREE.BoxGeometry(w, hgt, dep), new THREE.MeshBasicMaterial({ color: cat === 10 ? 0xe0a020 : cat === 11 ? 0x5fe3ff : 0x9fb4d8, transparent: true, opacity: 0.28, wireframe: false }));
+        var edges = new THREE.LineSegments(new THREE.EdgesGeometry(bxm.geometry), new THREE.LineBasicMaterial({ color: cat === 10 ? 0xe0a020 : cat === 11 ? 0x5fe3ff : 0x9fb4d8 })); bxm.add(edges);
+        var cx = (m[1] + A.w / 2 - 80) * s, cz = (m[3] + B.h / 2 - 26) * s, cy = (deckRow - (m[2] + A.h / 2)) * s; bxm.position.set(cx, cy, cz);
+        partGroup.add(bxm); nomodel++;
+      }
+    }
+    placeWater(len, deckZ); placeDock(); if (dockN && !dockGroup.children.length) applyPort();
+    await spawnAircraft(d, len, deckZ);
+    if (!flying) { flying = true; last = performance.now(); requestAnimationFrame(tick); }      // one render loop for the water and the aircraft
+    window.dbg3d = { cam: cam, partGroup: partGroup, hullGroup: hullGroup, render: render, material: material, orbit: orbit, setCam: setCam, THREE: THREE, loadModel: loadModel, IDX: IDX, D: D, cur: cur, s: s, deckRow: deckRow };
+    $('info').innerHTML = '<b>' + H.name + '</b> - ' + d.mounts.length + ' parts (' + count + ' modelled, ' + nomodel + ' boxes)<br>' + (d.name ? d.name + '<br>' : '') + 'one grid cell = ' + Math.round(s) + ' model units; deck row ' + deckRow;
+    orbit.target.set(0, 0, 0); orbit.dist = len * 1.05; setCam(); $('msg').textContent = ''; render();
+    $('bChase').disabled = !fliers.length; if (!fliers.length) setChase(false);
+    buildDone = true; reveal();
+  }
+
+  // ---- aircraft: the planes of the design (aircraft slots) fly over the ship, each pass in a random direction ----
+  // model -> aircraft: models/chips.json (chip 'GROUP:n' of the record, else its name); the nose is the model's -y, like the hull's bow (assumed, as for the parts); the flight speed and height are scaled with the ship length (a visual choice, not game data)
+  var flyGroup = new THREE.Group(), fliers = [], flyTime = 0, chipMap = null; root.add(flyGroup);
+  async function spawnAircraft(d, len) {
+    clear(flyGroup); fliers = [];
+    if (!d.air || !d.air.length) return;
+    if (!chipMap) { try { chipMap = await (await fetch('models/chips.json')).json(); } catch (e) { chipMap = { chips: {}, names: {} }; } }
+    if (!speeds) { try { speeds = await (await fetch('aircraft_speed.json')).json(); } catch (e) { speeds = {}; } }      // the record's speed entry (DAT 6, middle strength level)
+    var total = 0;
+    for (var a of d.air) {
+      var rec = D.aircraft.find(function (x) { return x.r === a[0]; }); if (!rec) continue;
+      var mid = chipMap.chips[rec.tc] || chipMap.names[rec.name] || rec.model;      // rec.model: found from the model index's entity names (designer.json) for the records the chip map lacks
+      if (!mid) { var al = D.aircraft.filter(function (x) { return x !== rec && x.tc && (x.name.indexOf(rec.name + ' ') === 0 || rec.name.indexOf(x.name + ' ') === 0); })[0]; if (al) mid = chipMap.chips[al.tc]; }      // an aircraft record with no chip of its own ("F3H-2N") is the chip "F3H-2N Demon"
+      if (!mid || !IDX[mid]) continue;
+      var mo = await loadModel(mid); if (!mo) continue;
+      /* flights of 4 first: a slot with 4 or more planes always gets a full finger-four (the old share formula cut a slot to 3 planes when many slots were fitted); more than 4 planes make a second flight with the rest (8 planes at most per slot, 36 in all) */
+      var left = Math.min(a[1] || 1, 8);
+      while (left > 0 && total < 36) {
+      var share = Math.min(4, left); left -= share;
+      var flight = { members: [], wait: Math.random() * 6, leader: null, slotNo: a[3] };      // slotNo: the design's aircraft slot (0-6), for the 1-7 keys      /* a flight: planes of one slot fly together in formation, launched and landed together */
+      for (var i = 0; i < share && total < 36; i++, total++) {
+        var mesh = new THREE.Mesh(mo.g, material(mo)); mesh.matrixAutoUpdate = false; mesh.visible = false; flyGroup.add(mesh);
+        var rm = (mo.rots || []).map(function (r) { var rmesh = new THREE.Mesh(r.g, material(mo)); rmesh.matrixAutoUpdate = false; rmesh.visible = false; flyGroup.add(rmesh); return { mesh: rmesh, c: r.c, axis: r.axis, n: r.n }; });
+        var smat = shadowMat().clone(); smat.opacity = 0; smat.polygonOffsetFactor = -3; var shw = new THREE.Mesh(shadowGeo(), smat); shw.rotation.x = -Math.PI / 2; shw.visible = false; shw.renderOrder = 2; flyGroup.add(shw);      // the plane's shadow on the sea
+        var spanS = Math.max(mo.mx[0] - mo.mn[0], mo.mx[1] - mo.mn[1], mo.rotD || 0) * AIR_SCALE, dev = { al: spanS * 0.04, av: spanS * 0.03, w1: 2 * Math.PI / (4 + Math.random() * 3), w2: 2 * Math.PI / (5 + Math.random() * 3), p1: Math.random() * 6.28, p2: Math.random() * 6.28 };
+        var fl = { dev: dev, shadow: shw, span: Math.max(mo.mx[0] - mo.mn[0], mo.mx[1] - mo.mn[1]) * AIR_SCALE, mesh: mesh, rots: rm, mo: mo, wait: flight.wait, t: 0, dur: 1, th: 0, alt: 0, len: len, active: false, spd: speeds[rec.r] || 629, flight: flight, slot: i }; fliers.push(fl); flight.members.push(fl); if (!flight.leader) flight.leader = fl;
+        if (!mo.heli) { makeTrail(fl); makeNav(fl); }      // contrails and wing tip lights: every fixed-wing aircraft (propeller and rotor planes too); helicopters have neither      // contrails: fixed-wing aircraft only (helicopters have rotors)
+      }
+      }
+    }
+  }
+  // ---- contrails: a fading, widening string of soft white puffs behind every fixed-wing aircraft (a visual effect, not game data) ----
+  var TRAIL_N = 1400, TRAIL_LIFE = 4;
+  function makeTrail(f) {
+    var pos = new Float32Array(TRAIL_N * 3), al = new Float32Array(TRAIL_N), sz = new Float32Array(TRAIL_N), geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('alpha', new THREE.BufferAttribute(al, 1)); geo.setAttribute('size', new THREE.BufferAttribute(sz, 1)); geo.setDrawRange(0, 0);
+    var mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { scale: { value: 800 } },
+      vertexShader: 'attribute float alpha; attribute float size; varying float vA; uniform float scale; void main(){ vA = alpha; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * scale / max(1.0, -mv.z); gl_Position = projectionMatrix * mv; }',
+      fragmentShader: 'varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; gl_FragColor = vec4(1.0, 1.0, 1.0, vA * (1.0 - d * 2.0) * 0.6); }' });
+    var pts = new THREE.Points(geo, mat); pts.frustumCulled = false; pts.renderOrder = 1000; flyGroup.add(pts);      /* drawn after all the scenery: the puffs don't write depth, and the (alpha-tested, hence "transparent") dock meshes are sorted by their origin, so one drawn later painted over the trails */
+    /* the wing tips of this model: the vertices in the outer 5% of the width on each side (model x = across, y = nose to tail with the nose at -y, z = up): their mean height, distance across and place along the plane (swept wings: the tips are aft of the middle) */
+    var PA = f.mo.g.attributes.position.array, span = f.mo.mx[0] - f.mo.mn[0], lim = span * 0.05, n = 0, sx = 0, sy = 0, sz2 = 0, cxm = (f.mo.mx[0] + f.mo.mn[0]) / 2, cym = (f.mo.mn[1] + f.mo.mx[1]) / 2, czm = (f.mo.mn[2] + f.mo.mx[2]) / 2;
+    for (var q = 0; q < PA.length; q += 3) { if (PA[q] > f.mo.mx[0] - lim || PA[q] < f.mo.mn[0] + lim) { n++; sy += PA[q + 1]; sz2 += PA[q + 2]; } }
+    var tipY = n ? sy / n : cym, tipZ = n ? sz2 / n : czm;
+    f.trail = { pts: pts, geo: geo, mat: mat, hist: [], acc: 0, size: span * AIR_SCALE * 0.05, half: span / 2 * AIR_SCALE, aft: (tipY - cym) * AIR_SCALE, up: (tipZ - czm) * AIR_SCALE };      /* small puffs: a twentieth of the wing span, widening to about twice that */
+  }
+  // ---- navigation lights: a red light on the port (left) wing tip and a green one on the starboard (right), glowing sprites at the same wing tip points the contrails use; on when the lamps are (night, by the clock) ----
+  var navTex = null;
+  function makeNav(f) {
+    if (!navTex) { var c = document.createElement('canvas'); c.width = c.height = 64; var g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,255,255,0.7)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); navTex = new THREE.CanvasTexture(c); }
+    f.nav = [0xff2a1a, 0x20ff50].map(function (col) { var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: navTex, color: col, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); sp.visible = false; sp.renderOrder = 999; flyGroup.add(sp); return sp; });
+    f.navSize = Math.max(f.mo.mx[0] - f.mo.mn[0], f.mo.mx[1] - f.mo.mn[1]) * AIR_SCALE * 0.11;      // (half the first size, user)
+  }
+  function navUpdate(f, x, y, z, fade) {
+    if (!f.nav || !f.trail) return; var T = f.trail, c = Math.cos(f.th), s = Math.sin(f.th), on = lightsOn;
+    f.nav.forEach(function (sp, i) { var sd = i ? 1 : -1; sp.visible = on; if (!on) return; sp.position.set(x - s * T.half * sd - c * T.aft, y + T.up, z + c * T.half * sd - s * T.aft); sp.scale.setScalar(f.navSize); sp.material.opacity = fade; });
+  }
+  function trailAge(f, dt) {      // age the puffs, drop the old ones, refill the buffers
+    var T = f.trail; if (!T) return; T.mat.uniforms.scale.value = canvas.height * 0.5 / Math.tan(cam.fov * Math.PI / 360);
+    T.hist.forEach(function (h) { h.age += dt; }); while (T.hist.length && T.hist[0].age > TRAIL_LIFE) T.hist.shift();
+    var P = T.geo.attributes.position.array, A = T.geo.attributes.alpha.array, S = T.geo.attributes.size.array;
+    T.hist.forEach(function (h, i) { var k = h.age / TRAIL_LIFE; P[i * 3] = h.x; P[i * 3 + 1] = h.y; P[i * 3 + 2] = h.z; A[i] = (1 - k) * h.fade; S[i] = T.size * (0.8 + 1.4 * k); });
+    T.geo.setDrawRange(0, T.hist.length); T.geo.attributes.position.needsUpdate = T.geo.attributes.alpha.needsUpdate = T.geo.attributes.size.needsUpdate = true;
+  }
+  function trailAdd(f, dt, x, y, z, fade) {      // a new puff every TRAIL_STEP seconds, just behind the tail
+    var T = f.trail; if (!T) return; var v = Math.hypot(f.vx, f.vz) || 1, step = Math.max(0.006, T.size * 0.5 / v);      /* puffs overlap into a continuous line: spacing about half a puff, however fast the plane */
+    T.acc += dt;
+    /* the two wing tips: half the model's width to each side of the path point (model x = across, scaled and turned like the plane), a little aft of the middle (swept wings: the tips lie behind the wing root) */
+    var half = T.half, aft = T.aft, c = Math.cos(f.th), s = Math.sin(f.th); y += T.up;      // (aft > 0: the tips are behind the middle; up: their height above / below it - measured from the model)
+    while (T.acc >= step) {
+      T.acc -= step; var back = aft + v * T.acc;      // (several puffs in one frame are spread back along the path)
+      [-1, 1].forEach(function (sd) { T.hist.push({ x: x - s * half * sd - c * back, y: y, z: z + c * half * sd - s * back, age: T.acc, fade: fade }); });
+    }
+    while (T.hist.length > TRAIL_N) T.hist.shift();
+  }
+  // ---- water: the smooth sea of water.js (built from the game's sea tiles) at the hull's waterline (model height 0 = world Y -deckZ); the same sea as the model viewer, sized by the ship length ----
+  var waterSet = null, waterObj = null, wLen = 0, wDeck = 0, waterOn = true;      // the sea is always on (no button)
+  if (window.WGWater) WGWater.load('water/').then(function (s) { waterSet = s; if (cur && wLen) placeWater(wLen, wDeck); reveal(); }).catch(function () { waterFailed = true; reveal(); });
+  function placeWater(len, deckZ) {
+    if (waterObj) { root.remove(waterObj.mesh); waterObj.dispose(); waterObj = null; }
+    wLen = len; wDeck = deckZ;
+    shipLevel(); if (!waterOn || !waterSet) return;
+    var r = Math.max(len / 2, 800), size = Math.min(len * 16, 400000); cam.far = Math.max(200000, size * 1.5); cam.updateProjectionMatrix();
+    waterObj = WGWater.create(waterSet, { group: 0, row: 'own', size: size, segments: 160, tile: Math.max(r * 0.9, 1500), waveHeight: dockN ? 0 : r * 0.004,      /* lower waves (user: too high); flat in a port, like the dock page */ waveLength: r * 1.4, fogDensity: 0.5 / (r * 12) });
+    waterObj.mesh.position.y = -deckZ; root.add(waterObj.mesh); shipLevel(); if (typeof applyClock === 'function') applyClock();      /* in a port the sea is the dock's basin water level and the ship is moved to it (shipLevel); otherwise the sea is at the ship's waterline */
+  }
+  var flying = false, last = 0, speeds = null, baseTh = 0, AIR_SCALE = 0.2;
+  function launch(f) {      // a pass: the planes of a wave fly roughly the same way (a common heading +-7 degrees, re-rolled when no plane is up), in their own lanes, each at a speed proportional to its record's speed entry
+    if (!fliers.some(function (g) { return g.active; })) baseTh = (Math.random() < 0.5 ? 1 : -1) * Math.PI / 2;      /* the ship lies along world X, so heading +-90 degrees = across the ship, between the piers (a random heading flew into the dock) */
+    var th = baseTh + (Math.random() - 0.5) * 0.06, R = f.len * 3, off = (Math.random() - 0.5) * f.len * 0.6, v = Math.max(f.len / 30, Math.min(f.len / 2, f.len / 5 * f.spd / 629));
+    f.th = th; f.alt = f.len * (0.16 + Math.random() * 0.14);      /* higher (user: the low ones flew at crane height) */ if (dockN) f.alt += DOCK_LIFT + 300;      /* in a port the pass also clears the pier decks */ f.dur = 2 * R / v; f.t = 0; f.active = true;
+    var c = Math.cos(th), s = Math.sin(th); f.sx = -c * R - (-s) * off; f.sz = -s * R + c * off; f.vx = v * c; f.vz = v * s;
+  }
+  /* a flight (up to 4 planes of one type) flies a pass together in a finger-four: the leader in front, two wingmen behind to either side, the fourth behind the right one; the spacing is about one and a half wing spans (a visual choice) */
+  var FORM = [[0, 0], [-1, 1], [1, 1], [2, 2]], launchGap = 0; window.dbgFly = function () { return { fliers: fliers, launchGap: launchGap, launchFlight: launchFlight }; };      // (for checking from the console)
+  function launchFlight(fl) {
+    /* formation spacing from the aircraft's size (the larger of its span, its length and its rotor): small fighters about 1.8 sizes apart, big ones (helicopters, bombers, early warning planes: more than 2500 model units) 2.8 sizes apart */
+    var L = fl.leader; launch(L); var unit = Math.max(L.mo.mx[0] - L.mo.mn[0], L.mo.mx[1] - L.mo.mn[1], L.mo.rotD || 0), c = Math.cos(L.th), s = Math.sin(L.th), W = unit * AIR_SCALE * (unit > 2500 ? 2.8 : 1.8);
+    fl.members.forEach(function (m) {
+      var o = FORM[m.slot] || [0, 0], lat = o[0] * W, aft = o[1] * W;
+      m.th = L.th; m.alt = L.alt; m.dur = L.dur; m.t = 0; m.vx = L.vx; m.vz = L.vz; m.active = true;
+      m.sx = L.sx + (-s) * lat - c * aft; m.sz = L.sz + c * lat - s * aft;      // across = (-sin, cos) of the heading, aft = against it
+    });
+  }
+  /* chase cam: follows one aircraft that is flying a pass, from behind and above, swung to one side so the view is over its shoulder, looking a little ahead of it (a visual choice, not game data).
+     Drag swings the camera round the plane (az / el), the wheel changes the distance (k); when the pass ends the camera moves on to the plane that has been up the shortest time, and waits where it is if none is up. */
+  var chase = { on: false, f: null, az: 0.45, el: 0.25, k: 1 };
+  function setChase(on) {
+    chase.on = on && !!fliers.length; chase.f = null; $('bChase').classList.toggle('on', chase.on);
+    if (!chase.on) { cam.fov = 40; cam.updateProjectionMatrix(); setCam(); render(); }      // back to the orbit view
+  }
+  function chaseCam() {
+    var f = chase.f; if (!f || !f.active) f = chase.f = fliers.filter(function (g) { return g.active; }).sort(function (a, b) { return a.t - b.t; })[0] || null;
+    if (!f) return;
+    var sp = (f.mo.mx[0] - f.mo.mn[0]) * AIR_SCALE, c = Math.cos(f.th), s = Math.sin(f.th), d = sp * 2.4 * chase.k, a = chase.az, h = chase.el;
+    var P = new THREE.Vector3(f.sx + f.vx * f.t, f.alt, f.sz + f.vz * f.t);
+    var bx = -c * Math.cos(a) + s * Math.sin(a), bz = -c * Math.sin(a) - s * Math.cos(a);      // "behind the plane" (-heading) turned about the vertical by az
+    cam.up.set(0, 1, 0); cam.position.set(P.x + bx * Math.cos(h) * d, P.y + Math.sin(h) * d, P.z + bz * Math.cos(h) * d);
+    var nn = Math.max(1, sp * 0.05); if (Math.abs(nn - cam.near) > 1e-3) { cam.near = nn; cam.updateProjectionMatrix(); }
+    cam.lookAt(P.x + c * sp * 0.9, P.y, P.z + s * sp * 0.9);
+  }
+  /* keys 1-7 launch a flight of that aircraft slot (the aircraft panel's slot numbers) at once, ahead of the automatic order; with a flight of that slot already in the air, the next flight of the slot (a slot of more than 4 planes has two) goes; nothing otherwise */
+  window.addEventListener('keydown', function (e) {
+    if (e.ctrlKey || e.metaKey || e.altKey || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+    var n = /^[1-7]$/.test(e.key) ? +e.key - 1 : -1; if (n < 0) return;
+    var cand = fliers.filter(function (g) { return g.flight.leader === g && g.flight.slotNo === n && !g.active; })[0];
+    if (cand) { launchFlight(cand.flight); launchGap = Math.max(launchGap, 1.5); $('info').dataset.last = 'slot ' + (n + 1); e.preventDefault(); }
+  });
+  function tick(now) {
+    var dt = Math.min(0.1, (now - last) / 1000); last = now; if (waterObj) waterObj.update(now / 1000);
+    /* launches are spread out: one flight every 4 to 9 seconds (the gap), up to 5 flights in the air; the flight that has waited longest goes first, so every type gets its turn (the first slot used to win every time) */
+    launchGap = Math.max(0, launchGap - dt); var airborne = fliers.filter(function (g) { return g.active && g.flight.leader === g; }).length;
+    if (launchGap <= 0 && airborne < 5) {
+      var due = fliers.filter(function (g) { return !g.active && g.flight.leader === g && g.wait <= 0; }).sort(function (a, b) { return a.wait - b.wait; })[0];
+      if (due) { launchFlight(due.flight); launchGap = 4 + Math.random() * 5; }
+    }
+    fliers.forEach(function (f) {
+      trailAge(f, dt);
+      if (!f.active) { if (f.flight.leader === f) f.wait -= dt; return; }      // (the leader's wait runs down here; the launch is decided above)
+      f.t += dt; if (f.t >= f.dur) { f.active = false; f.mesh.visible = false; f.shadow.visible = false; if (f.nav) f.nav.forEach(function (sp) { sp.visible = false; }); f.rots.forEach(function (r) { r.mesh.visible = false; }); if (f.flight.leader === f) f.wait = 1 + Math.random() * 5; return; }
+      var c = Math.cos(f.th), s = Math.sin(f.th), fwd = new THREE.Vector3(c, 0, s), side = new THREE.Vector3(-s, 0, c), M = new THREE.Matrix4();
+      M.makeBasis(side.clone().multiplyScalar(-AIR_SCALE), fwd.clone().multiplyScalar(-AIR_SCALE), new THREE.Vector3(0, AIR_SCALE, 0));      // 20% size
+      var cx = (f.mo.mn[0] + f.mo.mx[0]) / 2, cy = (f.mo.mn[1] + f.mo.mx[1]) / 2, cz = (f.mo.mn[2] + f.mo.mx[2]) / 2, o = new THREE.Vector3(cx, cy, cz).applyMatrix4(M);      // centre the model on its path
+      /* a little drift: each plane weaves slowly from side to side (4% of its span at most) and up and down (3%), on its own periods and phases, so a formation is not rigid (a visual choice) */
+      var dd = f.dev, lat = dd.al * Math.sin(f.t * dd.w1 + dd.p1), vert = dd.av * Math.sin(f.t * dd.w2 + dd.p2), px = f.sx + f.vx * f.t - s * lat, pz = f.sz + f.vz * f.t + c * lat, py = f.alt + vert;
+      M.setPosition(px - o.x, py - o.y, pz - o.z); f.mesh.matrix.copy(M); f.mesh.visible = true;
+      var u = f.t / f.dur, fade = Math.max(0, Math.min(1, u / 0.12, (1 - u) / 0.25));      // fades in at the start of the pass and out over the last quarter
+      trailAdd(f, dt, px, py, pz, fade); navUpdate(f, px, py, pz, fade);
+      var spx = px, spz = pz; f.shadow.position.set(spx, -wDeck + 4, spz); f.shadow.scale.set(f.span * 1.5, f.span * 1.5, 1); f.shadow.material.opacity = fade * 0.5 * Math.max(0.25, 1 - f.alt / (f.len * 0.7)); f.shadow.visible = shadowsOn;      // right under the plane, fainter the higher it flies
+      f.mesh.material.transparent = true; f.mesh.material.opacity = fade; f.rots.forEach(function (r) { r.mesh.material.transparent = true; r.mesh.material.opacity = fade; });
+      f.rots.forEach(function (r, i) {      // rotors spin about their hub, the vertical model axis (alternate rotors turn the other way; the speed is a visual choice, the game has 4 quarter-turn frames)
+        var a = now / 1000 * 25 * (i % 2 ? -1 : 1), T1 = new THREE.Matrix4().makeTranslation(r.c[0], r.c[1], r.c[2]), R1 = r.n ? new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(r.n[0], r.n[1], r.n[2]), a) : r.axis === 'y' ? new THREE.Matrix4().makeRotationY(a) : r.axis === 'x' ? new THREE.Matrix4().makeRotationX(a) : new THREE.Matrix4().makeRotationZ(a), T0 = new THREE.Matrix4().makeTranslation(-r.c[0], -r.c[1], -r.c[2]);
+        r.mesh.matrix.copy(M).multiply(T1).multiply(R1).multiply(T0); r.mesh.visible = true;
+      });
+    });
+    if (chase.on) chaseCam();
+    sky.position.copy(cam.position); tweenTick(now); fxTick(now / 1000, dt);
+    render(); requestAnimationFrame(tick);
+  }
+
+  // ---- port: the game's floating dock (Skidbladnir) 1-8 = DOCK00-07 (models/composite_drydock_N, drydock.html), still, no animation, no props (cranes, floodlights ...).
+  // Scale 0.1 (assumed: the dock page draws its props at x10 and the hull and weapon models share the props' units, so the dock is 10 times the ship's units), the basin (its biggest flat water level) is centred on the ship with
+  // the ship's waterline at that level, and the dock's long axis runs along the ship (which end is the bow is a guess). The dock's own large hull mass is part of the scenery and shows too.
+  var dockGroup = new THREE.Group(), dockN = 0, dockLoad = 0, compList = null; root.add(dockGroup); try { dockN = +localStorage.getItem('wg2.designer3d.port') || 0; } catch (e) {}
+  var FACE_SHADE = 0.1;      // the dock's face colours (.col: 93..134 of 128 on the pier decks, light and dark triangles / squares = baked shadows) are applied at this strength: 1 = raw (what dock page shows), 0 = flat. The in-game pictures look much more even, so they are softened (an estimate; the game's own ambient light is not known)
+  function dockGeo(dv, off, p, cols, coff) {
+    var qo = off + p.v * 12, uo = qo + p.q * 8, pos = [], uv = [], rgb = [];
+    for (var k = 0; k < p.q; k++) {
+      var q4 = [0, 1, 2, 3].map(function (j) { return dv.getUint16(qo + (k * 4 + j) * 2, true); }), cr = cols ? 1 - (1 - cols[(coff + k) * 3] / 128) * FACE_SHADE : 1, cg = cols ? 1 - (1 - cols[(coff + k) * 3 + 1] / 128) * FACE_SHADE : 1, cb = cols ? 1 - (1 - cols[(coff + k) * 3 + 2] / 128) * FACE_SHADE : 1;
+      (q4[2] === q4[3] ? [[0, 1, 2]] : [[0, 1, 2], [0, 2, 3]]).forEach(function (t) { t.forEach(function (c) { var vi = q4[c]; pos.push(dv.getFloat32(off + vi * 12, true), dv.getFloat32(off + vi * 12 + 4, true), dv.getFloat32(off + vi * 12 + 8, true)); rgb.push(cr, cg, cb); uv.push(dv.getUint16(uo + (k * 8 + c * 2) * 2, true) / 16384, dv.getUint16(uo + (k * 8 + c * 2 + 1) * 2, true) / 16384); }); });
+    }
+    var g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); if (cols) g.setAttribute('color', new THREE.Float32BufferAttribute(rgb, 3)); return { g: g, pos: pos };
+  }
+  async function applyPort() {
+    if (cvDeckZ == null && D) { try { var cvH = Object.keys(D.hulls).map(function (k) { return D.hulls[k]; }).find(function (h) { return h.name === 'Supercarrier'; }); cvDeckZ = cvH ? await deckZOf(cvH) : wDeck; } catch (e) { cvDeckZ = wDeck; } }
+    var ticket = ++dockLoad; clear(dockGroup); dockGroup.children.length = 0; if (!dockN) { render(); return; }
+    if (!compList) { try { compList = await (await fetch('models/composites.json')).json(); } catch (e) { compList = []; } }
+    var c = compList.find(function (x) { return x.id === 'composite_drydock_' + (dockN - 1); }); if (!c) return;
+    var dv = new DataView(await (await fetch('models/' + c.id + '.bin')).arrayBuffer()), cols = null; if (c.colors) { try { cols = new Uint8Array(await (await fetch('models/' + c.colors)).arrayBuffer()); } catch (e) {} }
+    var off = 0, coff = 0, built = [];
+    for (var i = 0; i < c.parts.length; i++) { var p = c.parts[i], r = dockGeo(dv, off, p, cols, coff); off += p.v * 12 + p.q * 24; coff += p.q; built.push({ g: r.g, pos: r.pos, t: await tex(p.texid) }); }
+    if (ticket !== dockLoad) return;
+    var zc = {};      // the basin: the horizontal water level with most faces (flat triangles of one height), its middle in plan
+    built.forEach(function (b) { for (var v = 0; v < b.pos.length; v += 9) { var z0 = b.pos[v + 2]; if (Math.abs(b.pos[v + 5] - z0) < 1 && Math.abs(b.pos[v + 8] - z0) < 1) { var key = Math.round(z0 / 4) * 4, e = zc[key] || (zc[key] = { n: 0, x: 0, y: 0 }); e.n++; for (var q = 0; q < 3; q++) { e.x += b.pos[v + q * 3]; e.y += b.pos[v + q * 3 + 1]; } } } });
+    var best = null; Object.keys(zc).forEach(function (k) { if (zc[k].n > 20 && (!best || zc[k].n > best.n) && +k > -2000 && +k < 6000) best = { z: +k, n: zc[k].n, x: zc[k].x / (zc[k].n * 3), y: zc[k].y / (zc[k].n * 3) }; });
+    if (!best) best = { z: 0, x: 0, y: 0 };
+    best.x = 0; best.y = -4096;      // measured on the flat deck faces at z 2048 of all eight docks (user: centre the ship between the two piers and further forward): the two floating piers are x -33792..-25600 and +25600..+33792 (mirror images, so the middle is x 0) and run y -61440..53248 (middle -4096)
+    var ar2 = {}, pierZ = best.z;      // the pier / quay deck = the flat level with the biggest area between z 3000 and 10000 (7456 in all docks); its top is put at the ship's deck, a little below it (user: first try had the dock too low, the ship too high)
+    built.forEach(function (b) { for (var v = 0; v < b.pos.length; v += 9) { var z1 = b.pos[v + 2]; if (Math.abs(b.pos[v + 5] - z1) < 1 && Math.abs(b.pos[v + 8] - z1) < 1 && z1 > 3000 && z1 < 10000) { var ky = Math.round(z1 / 8) * 8; ar2[ky] = (ar2[ky] || 0) + Math.abs((b.pos[v + 3] - b.pos[v]) * (b.pos[v + 7] - b.pos[v + 1]) - (b.pos[v + 6] - b.pos[v]) * (b.pos[v + 4] - b.pos[v + 1])); } } });
+    var ba = 0; Object.keys(ar2).forEach(function (k) { if (ar2[k] > ba) { ba = ar2[k]; pierZ = +k; } });
+    var sc = 0.1, M = new THREE.Matrix4().set(0, -sc, 0, best.y * sc, 0, 0, sc, -pierZ * sc, -sc, 0, 0, best.x * sc, 0, 0, 0, 1); dockGroup.userData.basinRel = (best.z - pierZ) * sc;      /* the dock stays where the user set it (pier deck by the ship's deck row); its basin water is basinRel below that reference */      // model (x, y, z) -> world X = -y, Y = z, Z = -x (turned 180 degrees from the first try), about the basin centre, the pier deck at Y 0
+    built.forEach(function (b) { var mat = cols ? new THREE.MeshBasicMaterial({ color: 0xffffff, map: b.t, vertexColors: true, side: THREE.DoubleSide, transparent: !!b.t, alphaTest: b.t ? 0.4 : 0 }) : new THREE.MeshStandardMaterial({ color: b.t ? 0xffffff : 0x8fb4d8, map: b.t, side: THREE.DoubleSide, transparent: !!b.t, alphaTest: b.t ? 0.4 : 0 }); var m = new THREE.Mesh(b.g, mat); m.frustumCulled = false; dockGroup.add(m); });
+    if (shadowsOn) {      // the port's own structures (piers, buildings, platforms, its big hull) cast a shadow on the water below: every face that stands clear above the basin water, flattened onto it, drawn once (stencil, so overlaps do not darken twice)
+      var sp = []; built.forEach(function (b) { for (var v = 0; v < b.pos.length; v += 9) { if (Math.min(b.pos[v + 2], b.pos[v + 5], b.pos[v + 8]) < best.z + 120) continue; for (var q = 0; q < 3; q++) sp.push(b.pos[v + q * 3], b.pos[v + q * 3 + 1], best.z + 12); } });
+      if (sp.length) { var sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3)); var smt = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, stencilWrite: true, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc, stencilZPass: THREE.ReplaceStencilOp }), sm = new THREE.Mesh(sg, smt); sm.frustumCulled = false; sm.renderOrder = 1; dockGroup.add(sm); }
+    }
+    try { await placeProps(c, ticket); } catch (e) {}
+    if (ticket !== dockLoad) return;
+    dockGroup.matrixAutoUpdate = false; dockGroup.matrix.copy(M); dockGroup.position.y = 0; dockGroup.userData.base = M; dockGroup.userData.ready = true; dockGroup.userData.seaY = M.elements[13] + DOCK_LIFT; placeDock(); if (wLen) placeWater(wLen, wDeck); applyClock(); render(); reveal();      // seaY = dock model z 0 (its open sea)
+  }
+  // props (cranes, floodlights, trucks, containers, the small ship, AA mounts): the dock map's placement table (models/dock_objects.json, tools/build_dock_objects.py), placed as drydock.html does with its defaults:
+  // position = map units x 4096 in the dock's model space, facing from the row (45 degree steps, or a yaw in radians for script props), scale x10 (x30 for the cranes DOCKJ15 / 16 / 20), DOCKJ07 lowered by its gap; lamp glows are off (as on that page by default)
+  var placements = null, propCache = {}, lightInfo = null, lightsOn = false, shadowsOn = true, shGeo = null, shMat = null;
+  try { shadowsOn = localStorage.getItem('wg2.designer3d.shadows') !== '0'; } catch (e) {}
+  function shadowGeo() { return shGeo || (shGeo = new THREE.PlaneGeometry(1, 1)); }
+  function shadowMat() {      // one shared radial-gradient texture: black, 55% opaque in the middle, clear at the edge
+    if (shMat) return shMat; var c = document.createElement('canvas'); c.width = c.height = 128; var g = c.getContext('2d'), gr = g.createRadialGradient(64, 64, 6, 64, 64, 62);
+    gr.addColorStop(0, 'rgba(0,0,0,0.55)'); gr.addColorStop(0.55, 'rgba(0,0,0,0.38)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+    return shMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  }
+  function yawOf(o) { if (o.j === 41 && o.x > 10 && o.z < 1.5) return Math.PI / 4 + (o.yaw + 0.8); return o.yaw !== undefined ? o.yaw + (o.j === 41 ? 3 * Math.PI / 2 : Math.PI / 2) : (90 + o.v * 45) * Math.PI / 180; }
+  var PLOWER = { 7: 510 }, PMULT = { 15: 3, 16: 3, 20: 3 };
+  function propModel(id) {
+    if (propCache[id]) return propCache[id];
+    return propCache[id] = (async function () {
+      var m = IDX[id]; if (!m) return null; var dv = new DataView(await (await fetch('models/' + id + '.bin')).arrayBuffer()), off = 0, gs = [], t = m.tex != null ? await texKey(id) : null;
+      m.parts.forEach(function (p) { if (p.kind === 'mesh' && p.slot !== 12) gs.push(dockGeo(dv, off, p, null, 0).g); off += p.v * 12 + p.q * 24; });
+      var bb = new THREE.Box3(); gs.forEach(function (g) { g.computeVertexNormals(); g.computeBoundingBox(); bb.union(g.boundingBox); });
+      var glow = null; if (!lightInfo) { try { lightInfo = await (await fetch('models/dock_lights.json')).json(); } catch (e) { lightInfo = {}; } }
+      if (lightInfo[id]) { try { glow = dockGeo(new DataView(await (await fetch('models/' + id + '_L.bin')).arrayBuffer()), 0, lightInfo[id], null, 0).g; glow.computeVertexNormals(); } catch (e) { glow = null; } }      // the lamp glows / light beams (slot 12 faces, exported to <id>_L.bin), drawn additive
+      return { gs: gs, tex: t, glow: glow, bb: bb };
+    })();
+  }
+  async function placeProps(c, ticket) {
+    if (!placements) { try { placements = await (await fetch('models/dock_objects.json')).json(); } catch (e) { placements = {}; } }
+    var list = placements[c.id.slice(-1)] || [];
+    for (var i = 0; i < list.length; i++) {
+      var o = list[i], mo = o.model && await propModel(o.model); if (!mo) continue; if (ticket !== dockLoad) return;
+      var sc = 10 * (PMULT[o.j] || 1);
+      mo.gs.forEach(function (g) {
+        var mat = new THREE.MeshStandardMaterial({ color: mo.tex ? 0xffffff : 0x8fb4d8, map: mo.tex, metalness: 0.05, roughness: 0.85, side: THREE.DoubleSide, transparent: !!mo.tex, alphaTest: mo.tex ? 0.4 : 0 }), m = new THREE.Mesh(g, mat);
+        m.frustumCulled = false; m.rotation.z = yawOf(o); m.scale.setScalar(sc); m.position.set(o.x * 4096, o.y * 4096, o.z * 4096 - (PLOWER[o.j] || 0) * sc); dockGroup.add(m);
+      });
+      if (shadowsOn && mo.gs.length && !mo.bb.isEmpty()) {      // a soft blob shadow on the ground under the prop: its footprint (bounding box in plan) a little enlarged, dark in the middle and fading out
+        var ex = mo.bb.max.x - mo.bb.min.x, ey = mo.bb.max.y - mo.bb.min.y, ccx = (mo.bb.max.x + mo.bb.min.x) / 2, ccy = (mo.bb.max.y + mo.bb.min.y) / 2, yw = yawOf(o), cs = Math.cos(yw), sn = Math.sin(yw);
+        if (Math.max(ex, ey) * sc > 400) {      // (nothing smaller than 400 world... units: crates and barrels get no blob)
+          var sh = new THREE.Mesh(shadowGeo(), shadowMat()); sh.frustumCulled = false; sh.renderOrder = 1; sh.userData.shadow = true;
+          sh.rotation.z = yw; sh.scale.set(ex * sc * 1.5, ey * sc * 1.5, 1);
+          sh.position.set(o.x * 4096 + (ccx * cs - ccy * sn) * sc, o.y * 4096 + (ccx * sn + ccy * cs) * sc, o.z * 4096 - (PLOWER[o.j] || 0) * sc + 25); dockGroup.add(sh);
+        }
+      }
+      if (mo.glow) {      // lights: additive glow of the lamp faces (the textured emissive trick of the dock page), shown with the Lights button
+        var gm = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffffff, emissiveMap: mo.tex, map: mo.tex, side: THREE.DoubleSide, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }), gmesh = new THREE.Mesh(mo.glow, gm);
+        gmesh.frustumCulled = false; gmesh.userData.glow = true; gmesh.visible = lightsOn; gmesh.rotation.z = yawOf(o); gmesh.scale.setScalar(sc); gmesh.position.set(o.x * 4096, o.y * 4096, o.z * 4096 - (PLOWER[o.j] || 0) * sc); dockGroup.add(gmesh);
+      }
+    }
+  }
+  var DOCK_LIFT = 260;      // world units the pier deck stands above the ship's deck row (user-set height). The dock's own basin water is the sea in a port, and the SHIP is dropped (or lifted) so its waterline is on it (shipDY), not the water moved to the ship
+  function shipLevel() { hullGroup.position.y = partGroup.position.y = boxGroup.position.y = 0; return 0; }      /* the ship is never moved: its waterline is the sea (the first version of this shifted the hull groups and the parts came apart, user) */      /* the sea / basin is at Y = basinRel + DOCK_LIFT; the ship's waterline is at -deckZ */
+  function placeDock() { if (dockGroup.userData.base) { var M = dockGroup.userData.base.clone(); M.elements[13] += DOCK_LIFT + (cvDeckZ == null ? wDeck : cvDeckZ) - wDeck; dockGroup.matrix.copy(M);      /* the dock hangs at a fixed height above the WATER: the height the user confirmed with the Supercarrier (its deck row = world 0, so DOCK_LIFT above its deck), whatever the ship's own deck height is */ dockGroup.matrixWorldNeedsUpdate = true; } }      // the ship's waterline is world Y = -deckZ
+
+  // ---- game clock in a port (same decoded data as drydock.html, see notes/weather.md): water/clock_all.json = per weather, every 2 game minutes: [phase_a, phase_b, blend 0..1024, sea palette set (-1 = keep),
+  // colour0, flash colour, colour2, floats7 ([3] fog far in map units, [4] light scale), light9 = sky colour stops (slot 4 = horizon = fog colour)]. Used only while a port is selected; the ship's own view keeps its flat night-blue sky.
+  // Map units are 4096 dock model units there; here the dock is drawn at 0.1, so one map unit = 409.6 world units.
+  var CK = null, seaB = null, lastSet = 0, MAPW = 409.6, clkMin = 720, MAXP = 3000, fxs = { w: 0, flash: 0, nextFlash: 3, fogFar: 0 };
+  var skyGeo = new THREE.SphereGeometry(1, 16, 120), skyCol = new Float32Array(skyGeo.attributes.position.count * 3); skyGeo.setAttribute('color', new THREE.BufferAttribute(skyCol, 3));
+  var sky = new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false })); sky.renderOrder = -2; sky.visible = false; sky.frustumCulled = false; scene.add(sky);
+  var seeds = new Float32Array(MAXP * 4); for (var si = 0; si < seeds.length; si++) seeds[si] = Math.random();
+  var rainPos = new Float32Array(MAXP * 6), rainGeo = new THREE.BufferGeometry(); rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+  var rain = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ transparent: true, fog: false, depthWrite: false })); rain.frustumCulled = false; rain.visible = false; scene.add(rain);
+  var snowPos = new Float32Array(MAXP * 3), snowGeo = new THREE.BufferGeometry(); snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos, 3));
+  var dotC = document.createElement('canvas'); dotC.width = dotC.height = 32; (function (g) { var gr = g.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 32, 32); })(dotC.getContext('2d'));
+  var snow = new THREE.Points(snowGeo, new THREE.PointsMaterial({ map: new THREE.CanvasTexture(dotC), transparent: true, depthWrite: false, fog: false, sizeAttenuation: true })); snow.frustumCulled = false; snow.visible = false; scene.add(snow);
+  var flashLight = new THREE.AmbientLight(0xffffff, 0); scene.add(flashLight);
+  function seaPal(st, pa, pb, f) { var o = new Uint8Array(1024), A = st * 8192 + pa * 1024, B = st * 8192 + pb * 1024; for (var k = 0; k < 1024; k++) { var a = seaB[A + k], b = seaB[B + k]; o[k] = (pa === pb || f === 0) ? a : f === 1024 ? b : a + Math.trunc((b - a) * f / 1024); } return o; }
+  function lumC(c) { return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]; }
+  function ambC(r) { return [0, 1, 2].map(function (i) { return Math.min(255, (r[4][i] + r[5][i]) * r[7][4] / 128); }); }      // (colour0 + flash) x float4 / 128
+  function skyColour(L, el) { var S = CK.sky_stops_deg; if (el >= S[0]) return L[0]; for (var i = 1; i < 8; i++) if (el >= S[i]) { var t = (S[i - 1] - el) / (S[i - 1] - S[i]); return [0, 1, 2].map(function (k) { return L[i - 1][k] + (L[i][k] - L[i - 1][k]) * t; }); } return L[7]; }
+  function fmtT(m) { m = Math.round(m / 2) * 2 % 1440; return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + m % 60).slice(-2); }
+  function parseTime(t) { var m = /^\s*(\d{1,2})(?::?(\d{2}))?\s*$/.exec(t); if (!m) return null; var h = +m[1], mi = m[2] ? +m[2] : 0; return h < 24 && mi < 60 ? h * 60 + mi : null; }
+  async function loadClock() {
+    if (CK) return true;
+    try {
+      CK = await (await fetch('water/clock_all.json')).json(); seaB = new Uint8Array(await (await fetch('water/sea_map16.bin')).arrayBuffer());
+      return true;
+    } catch (e) { CK = null; return false; }
+  }
+  function clockOff() {      // no port: the ship's own flat sky and lights
+    sky.visible = false; rain.visible = snow.visible = false; flashLight.intensity = 0; scene.background = new THREE.Color(0x07142b); scene.fog = null; amb0.intensity = 0.75; sun.intensity = 0.8;
+    if (waterObj) waterObj.setOptions({ fogFar: 0 }); ['clkL', 'wth'].forEach(function (i) { $(i).classList.add('dim'); });
+  }
+  function computeVis(m, w) {      // everything the sky / sea / light level need for one clock time and weather (so two times can be blended)
+    var r = CK.weathers[w][m / 2], pa = r[0], pb = r[1], f = r[2], st = r[3], L = r[8], sk = new Float32Array(skyCol.length), p = skyGeo.attributes.position;
+    for (var k = 0; k < p.count; k++) { var c = skyColour(L, Math.asin(Math.max(-1, Math.min(1, p.getY(k)))) * 57.29578); sk[3 * k] = c[0] / 255; sk[3 * k + 1] = c[1] / 255; sk[3 * k + 2] = c[2] / 255; }
+    var ref = ambC(CK.weathers[0][360]);
+    return { m: m, w: w, r: r, pa: pa, pb: pb, f: f, st: st, pal: seaPal(st >= 0 ? st : lastSet, pa, pb, f), sky: sk, fog: [L[4][0] / 255, L[4][1] / 255, L[4][2] / 255], far: r[7][3] * MAPW, fac: Math.min(1, lumC(ambC(r)) / lumC(ref)) };
+  }
+  function blendVis(a, b, e) {
+    var sk = new Float32Array(a.sky.length), pal = new Uint8Array(1024), i;
+    for (i = 0; i < sk.length; i++) sk[i] = a.sky[i] + (b.sky[i] - a.sky[i]) * e;
+    for (i = 0; i < 1024; i++) pal[i] = Math.round(a.pal[i] + (b.pal[i] - a.pal[i]) * e);
+    return { sky: sk, pal: pal, fog: [0, 1, 2].map(function (k) { return a.fog[k] + (b.fog[k] - a.fog[k]) * e; }), far: a.far + (b.far - a.far) * e, fac: a.fac + (b.fac - a.fac) * e };
+  }
+  var WATER_LEVEL = 0.8;      // overall level of the sea relative to its palette (an estimate: the game's noon palette is pale and the water shader brightens it again)
+  function showVis(v) {
+    if (waterObj && waterObj.setGamePalette) {      // the sea follows the same light level as everything else: its palette is scaled by it, the sun glint is halved and scaled too, and the sheen at shallow angles uses the horizon colour (the water has its own shading and ignored the scene lights, so noon came out blown out)
+      var wp = new Uint8Array(1024); for (var wi = 0; wi < 1024; wi++) wp[wi] = (wi & 3) === 3 ? v.pal[wi] : Math.round(v.pal[wi] * v.fac * WATER_LEVEL);
+      waterObj.setGamePalette(wp);
+      if (waterObj.uniforms) { var wu = waterObj.uniforms; if (wu.uSunCol && wu.uSunCol.value.setScalar) wu.uSunCol.value.setScalar(0.45 * v.fac); if (wu.uSky && wu.uSky.value.setRGB) wu.uSky.value.setRGB(v.fog[0], v.fog[1], v.fog[2]); }
+    }
+    skyCol.set(v.sky); skyGeo.attributes.color.needsUpdate = true; sky.visible = true; scene.background = null; sky.scale.setScalar(cam.far * 0.85);
+    var fogC = new THREE.Color(v.fog[0], v.fog[1], v.fog[2]); scene.fog = new THREE.Fog(fogC, 0, v.far); fxs.fogFar = v.far;
+    if (waterObj) { waterObj.setOptions({ fogNear: 0, fogFar: v.far }); if (waterObj.uniforms) waterObj.uniforms.uFog.value.copy(fogC); }
+    amb0.intensity = 0.75 * v.fac; sun.intensity = 0.8 * v.fac;      // the game's ambient relative to clear noon (approximate use, as on the drydock page)
+    dockGroup.children.forEach(function (mm) { if (mm.isMesh && mm.material.vertexColors) mm.material.color.setScalar(v.fac); });
+  }
+  function showFx(v) {      // the parts of a clock time that switch (lamps, weather particles) rather than blend
+    var m = v.m, w = v.w, pa = v.pa, pb = v.pb, f = v.f, on = m < 360 || m >= 1070; lightsOn = on; $('bLights').classList.toggle('on', on); dockGroup.children.forEach(function (c) { if (c.userData.glow) c.visible = on; });      // lamps by night: MY rule (as on the drydock page)
+    // weather effects: CK.effects[w] = [type (2 rain, 3 snow?), count, day colour B,G,R,A, night colour, mist density, fall speed ratio, lightning]
+    var e = CK.effects[w], night = pa === 4 && pb === 4 ? 1 : pb === 4 ? f / 1024 : pa === 4 ? 1 - f / 1024 : 0, d = e[2], n = e[3], cc = [0, 1, 2, 3].map(function (i) { return d[i] + (n[i] - d[i]) * night; }), rgb = new THREE.Color(Math.min(1, cc[2] / 128), Math.min(1, cc[1] / 128), Math.min(1, cc[0] / 128)), al = Math.min(1, cc[3] / 128);
+    fxs.w = w; rain.visible = e[0] === 2; snow.visible = e[0] === 3; rain.material.color.copy(rgb); rain.material.opacity = Math.min(1, al * 1.6); snow.material.color.copy(rgb); snow.material.opacity = al;
+    rainGeo.setDrawRange(0, Math.min(MAXP, e[1]) * 2); snowGeo.setDrawRange(0, Math.min(MAXP, e[1])); if (!e[6]) { fxs.flash = 0; flashLight.intensity = 0; }
+  }
+  var curVis = null;
+  async function applyClock() {
+    ['clkL', 'wth'].forEach(function (i) { $(i).classList.remove('dim'); });      // the clock works with or without a port
+    if (!(await loadClock())) { clockOff(); return; }
+    var m = Math.round(clkMin / 2) * 2 % 1440; if (!tw) { $('clkh').value = String(Math.floor(m / 60) % 12 || 12); $('clkap').value = m < 720 ? 'AM' : 'PM'; }
+    var v = computeVis(m, +$('wth').value); if (v.st >= 0) lastSet = v.st; curVis = v; showVis(v); showFx(v); render();
+  }
+  function fxTick(t, dt) {
+    if (!CK || !curVis) return; var e = CK.effects[fxs.w], B = Math.max(6000, orbit.dist * 0.7), cx = cam.position.x, cy = cam.position.y, cz = cam.position.z;
+    function wrap(v, c) { return c - B / 2 + ((v - c + B / 2) % B + B) % B; }
+    if (rain.visible || snow.visible) {
+      var n = Math.min(MAXP, e[1]), v = e[5] * B * 1.3;      // fall speed: the decoded ratio (rain 1.0, snow 0.2) x my scale; the particle box, streak length and flake size are my choices
+      for (var i = 0; i < n; i++) {
+        var s = 4 * i, x = wrap(seeds[s] * B * 7, cx), z = wrap(seeds[s + 2] * B * 7, cz), y = wrap(seeds[s + 1] * B * 7 - t * v * (0.85 + 0.3 * seeds[s + 3]), cy);
+        if (rain.visible) { rainPos.set([x, y, z, x + v * 0.004, y + v * 0.025, z], 6 * i); } else snowPos.set([x + Math.sin(t * 0.7 + seeds[s] * 40) * B * 0.01, y, z + Math.cos(t * 0.5 + seeds[s + 2] * 40) * B * 0.01], 3 * i);
+      }
+      rainGeo.attributes.position.needsUpdate = rain.visible; snowGeo.attributes.position.needsUpdate = snow.visible; snow.material.size = B * 0.012;
+    }
+    if (e[6]) {      // lightning (weathers 4, 7): the timing is mine, the fog during a flash is the game's
+      fxs.nextFlash -= dt; if (fxs.nextFlash <= 0) { fxs.flash = 0.25; fxs.nextFlash = 4 + Math.random() * 8; }
+      if (fxs.flash > 0) { fxs.flash -= dt; var k = Math.max(0, fxs.flash / 0.25) * (Math.sin(fxs.flash * 60) > -0.3 ? 1 : 0.3); flashLight.intensity = 2.5 * k; if (scene.fog) { scene.fog.near = k > 0.2 ? 100 * MAPW : 0; scene.fog.far = k > 0.2 ? 2 * 1980 * MAPW : fxs.fogFar; } }
+      else if (flashLight.intensity) { flashLight.intensity = 0; if (scene.fog) { scene.fog.near = 0; scene.fog.far = fxs.fogFar; } }
+    }
+  }
+  var tw = null;      // the time tween: the sky / fog / sea colours and the light level blend from the old time's look to the new one's over 1 second (running the clock through the day squeezed the whole dawn into a flicker)
+  function readTime() {      // 12 AM = midnight, 12 PM = noon, on the hour
+    var tgt = ((+$('clkh').value % 12) + ($('clkap').value === 'PM' ? 12 : 0)) * 60;
+    if (!CK || !curVis) { clkMin = tgt; tw = null; applyClock(); return; }
+    var w = +$('wth').value, from = curVis; tw = { a: from, b: computeVis(tgt, w), t0: performance.now(), tgt: tgt, fx: false };
+  }
+  function tweenTick(now) {
+    if (!tw) return; var u = Math.min(1, (now - tw.t0) / 1000), e = u * u * (3 - 2 * u);
+    if (u < 1) { showVis(blendVis(tw.a, tw.b, e)); if (u >= 0.5 && !tw.fx) { tw.fx = true; showFx(tw.b); } }
+    else { clkMin = tw.tgt; tw = null; applyClock(); }
+  }
+  $('clkh').onchange = $('clkap').onchange = readTime;
+  $('wth').onchange = function () { applyClock(); };
+  clockOff(); applyClock();      // the clock is applied from the start (clear, 12 PM), port or not
+
+  // ---- camera (drag: orbit, wheel: zoom, right drag: pan) ----
+  function setCam() { var e = orbit.el, a = orbit.az; var nn = Math.max(5, orbit.dist * 0.02); if (Math.abs(nn - cam.near) > 1e-3) { cam.near = nn; cam.updateProjectionMatrix(); }      /* the near plane follows the camera distance: with near 10 and far 200000+ the depth buffer could not tell the dock's stacked decks apart (they flickered) */ cam.up.set(0, e > 1.4 ? 0 : 1, e > 1.4 ? -1 : 0); /* looking straight down: the bow to the right, like the 2D plan view */ cam.position.set(orbit.target.x + orbit.dist * Math.cos(e) * Math.cos(a), orbit.target.y + orbit.dist * Math.sin(e), orbit.target.z + orbit.dist * Math.cos(e) * Math.sin(a)); cam.lookAt(orbit.target); }
+  function resize() { var w = innerWidth, h = innerHeight; renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1)); renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); render(); }
+  function render() { renderer.render(scene, cam); }
+  var drag = null;
+  canvas.addEventListener('mousedown', function (e) { drag = { x: e.clientX, y: e.clientY, pan: e.button !== 0 }; e.preventDefault(); });
+  window.addEventListener('mouseup', function () { drag = null; });
+  canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  window.addEventListener('mousemove', function (e) {
+    if (!drag) return; var dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
+    if (chase.on) { if (!drag.pan) { chase.az -= dx * 0.008; chase.el = Math.max(-0.3, Math.min(1.4, chase.el + dy * 0.008)); } return; }      // (the render loop draws the next frame)
+    if (drag.pan) { var k = orbit.dist * 0.0016, right = new THREE.Vector3().setFromMatrixColumn(cam.matrix, 0), up = new THREE.Vector3().setFromMatrixColumn(cam.matrix, 1); orbit.target.addScaledVector(right, -dx * k).addScaledVector(up, dy * k); }
+    else { orbit.az -= dx * 0.008; orbit.el = Math.max(-1.5, Math.min(1.5, orbit.el + dy * 0.008)); }
+    setCam(); render();
+  });
+  canvas.addEventListener('wheel', function (e) { e.preventDefault(); if (chase.on) { chase.k = Math.max(0.3, Math.min(8, chase.k * Math.exp(e.deltaY * 0.001))); return; } orbit.dist *= Math.exp(e.deltaY * 0.001); setCam(); render(); }, { passive: false });
+  $('bChase').onclick = function () { setChase(!chase.on); };
+  $('port').value = String(dockN); var portTok = 0;
+  $('port').onchange = async function () {      // changing the port: a quick fade to black, the swap behind it, then the same fade in as at load
+    var v = +this.value, tok = ++portTok, f = $('fade'); f.style.transition = 'opacity .35s ease-in'; f.style.opacity = '1'; await new Promise(function (r) { setTimeout(r, 380); }); if (tok !== portTok) return;
+    dockN = v; try { localStorage.setItem('wg2.designer3d.port', dockN); } catch (e) {} dockGroup.userData.base = null;
+    try { if (wLen) placeWater(wLen, wDeck); await applyPort(); applyClock(); render(); } catch (e) { console.error('port change failed', e); }
+    if (tok !== portTok) return; f.style.transition = ''; void f.offsetWidth; setTimeout(function () { f.style.opacity = '0'; }, 60);      // (a timer, not requestAnimationFrame: that stops in a background tab and would leave the screen black)
+  };
+  $('bLights').onclick = function () { lightsOn = !lightsOn; this.classList.toggle('on', lightsOn); dockGroup.children.forEach(function (c) { if (c.userData.glow) c.visible = lightsOn; }); render(); };
+  var brightV = 1; try { brightV = Math.max(0.5, Math.min(2, +localStorage.getItem('wg2.designer3d.bright') || 1)); } catch (e) {}
+  function setBright(v) { brightV = v; canvas.style.filter = v === 1 ? '' : 'brightness(' + v + ')'; }      // a filter on the canvas: everything drawn in it changes together
+  $('bri').value = String(brightV); setBright(brightV);
+  $('bri').oninput = function () { setBright(+this.value); try { localStorage.setItem('wg2.designer3d.bright', this.value); } catch (e) {} };
+  $('bri').ondblclick = function () { this.value = '1'; setBright(1); try { localStorage.setItem('wg2.designer3d.bright', '1'); } catch (e) {} };
+  $('bShot').onclick = function () {      // the canvas as it is on screen (the drawing buffer is kept), saved as a PNG download
+    render(); var src = canvas;
+    if (brightV !== 1) { src = document.createElement('canvas'); src.width = canvas.width; src.height = canvas.height; var sg = src.getContext('2d'); sg.filter = 'brightness(' + brightV + ')'; sg.drawImage(canvas, 0, 0); }      // the picture carries the brightness setting too
+    src.toBlob(function (b) { if (!b) return; var a = document.createElement('a'), nm = (cur && cur.name ? cur.name : (cur && D && D.hulls[cur.hull] ? D.hulls[cur.hull].name : 'design')).replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') || 'design'; a.href = URL.createObjectURL(b); a.download = 'wg2_' + nm + '.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000); }, 'image/png');
+  };
+  $('bTop').onclick = function () { setChase(false); orbit.el = 1.5; orbit.az = 0; setCam(); render(); };
+  $('bSide').onclick = function () { setChase(false); orbit.el = 0.05; orbit.az = Math.PI / 2; setCam(); render(); };
+  $('bReset').onclick = function () { setChase(false); orbit.az = -0.7; orbit.el = 0.5; orbit.target.set(0, 0, 0); if (cur) orbit.dist = (D.hulls[cur.hull] ? 1 : 1) * orbit.dist; setCam(); render(); };
+  window.addEventListener('resize', resize);
+  window.addEventListener('hashchange', function () { start(); });
+  async function start() { try { cur = await readHash(); $('edit').href = 'designer.html' + location.hash; await build(); } catch (e) { $('msg').textContent = 'Could not build this design: ' + e.message; } }
+
+  Promise.all([fetch('designer.json').then(function (r) { return r.json(); }), fetch('designer_sprites/index.json').then(function (r) { return r.json(); }), fetch('designer_sprites/hulls.json').then(function (r) { return r.json(); }), fetch('models/index.json').then(function (r) { return r.json(); })]).then(function (a) {
+    D = a[0]; SH = a[1]; HZ = a[2]; a[3].forEach(function (m) { IDX[m.id] = m; }); resize(); start(); window.view3d = { scene: scene, cam: cam, orbit: orbit, render: render, setCam: setCam, root: root };
+  });
+})();
+</script></body></html>

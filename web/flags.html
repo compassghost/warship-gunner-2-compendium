@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Warship Gunner 2 Compendium</title>
+<style>
+  :root {
+    --bg: #0d1421; --panel: #152033; --line: #2a3a55; --text: #dbe6f5; --muted: #8aa0bd; --accent: #5cc8ff;
+    --check-a: #2b2f3a; --check-b: #3a3f4d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #eef2f7; --panel: #fff; --line: #c9d3e0; --text: #16202e; --muted: #5a6b82; --accent: #0a6fb5;
+            --check-a: #e3e6eb; --check-b: #cfd4dc; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif; }
+  header { padding: 16px 16px 8px; max-width: 1100px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  .sub { color: var(--muted); margin: 0; }
+  .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 16px; max-width: 1100px; margin: 0 auto; }
+  input[type=search] { flex: 1 1 200px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); }
+  label { color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  select { padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); font: inherit; }
+  main { max-width: 1100px; margin: 0 auto; padding: 0 16px 40px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--cell, 150px), 1fr)); gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px; cursor: pointer; text-align: left; color: inherit; font: inherit; }
+  .card:hover, .card:focus-visible { border-color: var(--accent); outline: none; }
+  .card .name { font-size: 13px; margin-top: 6px; }
+  .chk { background-color: var(--check-a);
+    background-image: linear-gradient(45deg, var(--check-b) 25%, transparent 25%, transparent 75%, var(--check-b) 75%),
+                      linear-gradient(45deg, var(--check-b) 25%, transparent 25%, transparent 75%, var(--check-b) 75%);
+    background-size: 16px 16px; background-position: 0 0, 8px 8px; border-radius: 4px; overflow: hidden; aspect-ratio: 3 / 2; }
+  /* "None" background: show only the card colour behind the flag */
+  body.bg-none .chk { background: none; }
+  /* 256x128 quarters-wall textures; the original 64x64 versions (flag art in the top ~34 rows) are still offered as a second download */
+  .chk img { width: 133.34%; max-width: none; height: 100%; object-fit: fill; display: block; }   /* the art fills the left 192 of 256 columns */
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 16px; max-width: min(92vw, 520px); }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  dialog .chk { width: min(80vw, 384px); margin: 0 auto 10px; }
+  dialog h2 { margin: 0 0 4px; font-size: 18px; }
+  dialog p { margin: 2px 0; color: var(--muted); font-size: 13px; }
+  .how { margin: 10px 0 4px; padding: 8px 10px; border-left: 3px solid var(--accent); background: rgba(92,200,255,.08); border-radius: 0 6px 6px 0; font-size: 14px; }
+  .how .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 2px; }
+  .chip { display: inline-block; margin-top: 3px; padding: 1px 7px; border-radius: 999px; font-size: 11px; border: 1px solid var(--accent); color: var(--accent); }
+  .bonus { margin-top: 4px; font-size: 12px; color: #f2c14e; }
+  @media (prefers-color-scheme: light) { .bonus { color: #9a6a00; } }
+  .row { display: flex; gap: 8px; margin-top: 12px; }
+  .btn { padding: 7px 12px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; text-decoration: none; font: inherit; }
+  .btn:hover { border-color: var(--accent); }
+  .empty { color: var(--muted); padding: 24px 0; }
+  footer { max-width: 1100px; margin: 0 auto; padding: 0 16px 32px; color: var(--muted); font-size: 12px; }
+</style>
+<script src="shell.js" defer></script></head>
+<body><script src="nav.js"></script>
+<header>
+  <h1>Flags and Pennants</h1>
+  <p class="sub">256&times;128 textures from the game's <code>CHR.BIN</code> (the versions on the flag wall in the captain's quarters); the small 64&times;64 ship-flag versions can be downloaded too. Use the Background option to show transparency as a checkerboard or on the plain card colour.</p>
+</header>
+<div class="bar">
+  <input id="q" type="search" placeholder="Search flags (e.g. duck, jolly, navy)" aria-label="Search flags">
+  <label>Background
+    <select id="bg"><option value="none">None</option><option value="checker">Checkerboard</option></select>
+  </label>
+  <label><input id="bonusOnly" type="checkbox"> Bonus flags only</label>
+  <label>Size <input id="size" type="range" min="90" max="260" value="150"></label>
+  <span id="count" class="sub"></span>
+</div>
+<main>
+  <div id="grid" class="grid"></div>
+  <p id="empty" class="empty" hidden>No flags match.</p>
+</main>
+<footer>Images and names are game data (names from the game's own text table; the 26 &ldquo;Signal Flag&rdquo; entries are unnamed in the game and were identified here as the international signal-flag alphabet). Unlock information comes from Jeremy Kuris's GameFAQs guide &ldquo;Mission Pickups and Rewards&rdquo;. See the <a href="credits.html">credits</a> &middot; Fan project, not affiliated with the publisher.</footer>
+<dialog id="dlg">
+  <div class="chk"><img id="big" alt=""></div>
+  <h2 id="dname"></h2>
+  <p id="dmeta"></p>
+  <div class="how"><div class="lbl">How to get it</div><div id="dhow"></div></div>
+  <div class="how" id="deffbox"><div class="lbl">Effect</div><div id="deffect"></div></div>
+  <p id="dsrc"></p>
+  <div class="row"><a id="dl" class="btn" download>Download PNG</a><a id="dl64" class="btn" download>Download 64&times;64</a><button class="btn" id="close">Close</button></div>
+</dialog>
+<script>
+(async function () {
+  const grid = document.getElementById('grid'), q = document.getElementById('q'), size = document.getElementById('size');
+  const count = document.getElementById('count'), empty = document.getElementById('empty'), dlg = document.getElementById('dlg');
+  const BADGE = { inferno: 'Inferno Mode', kills: 'Kill award' };   // special unlocks get a chip on the card
+  let flags = [];
+  try { flags = await (await fetch('flags.json')).json(); }
+  catch (e) { grid.textContent = 'Could not load flags.json (serve this folder over http).'; return; }
+
+  function render() {
+    const t = q.value.trim().toLowerCase();
+    const bonusOnly = document.getElementById('bonusOnly').checked;
+    const list = flags.filter(f => (!bonusOnly || f.effect) &&
+      (!t || f.name.toLowerCase().includes(t) || (f.effect || '').toLowerCase().includes(t)));
+    grid.replaceChildren(...list.map(f => {
+      const b = document.createElement('button'); b.className = 'card'; b.type = 'button';
+      b.innerHTML = '<div class="chk"><img loading="lazy"></div><div class="name"></div>';
+      b.querySelector('img').src = f.hires || f.file; b.querySelector('img').alt = f.name;
+      b.querySelector('.name').textContent = f.name;
+      if (BADGE[f.unlock_kind]) { const c = document.createElement('span'); c.className = 'chip'; c.textContent = BADGE[f.unlock_kind]; b.appendChild(c); }
+      if (f.effect) { const c = document.createElement('div'); c.className = 'bonus'; c.textContent = '★ ' + f.effect; b.appendChild(c); }
+      b.onclick = () => open(f); return b;
+    }));
+    count.textContent = list.length + ' of ' + flags.length;
+    empty.hidden = list.length > 0;
+  }
+  function open(f) {
+    document.getElementById('big').src = f.hires || f.file; document.getElementById('big').alt = f.name;
+    document.getElementById('dname').textContent = f.name;
+    document.getElementById('dmeta').textContent = f.hires ? f.hires_width + '×' + f.hires_height + ' px · CHR.BIN entry ' + f.hires_id + ' (ship-flag version: ' + f.width + '×' + f.height + ', entry ' + f.id + ')'
+      : f.width + '×' + f.height + ' px · CHR.BIN entry ' + f.id;
+    document.getElementById('dhow').textContent = f.unlock || 'Unknown.';
+    document.getElementById('deffect').textContent = f.effect || '';
+    document.getElementById('deffbox').hidden = !f.effect;
+    document.getElementById('dsrc').textContent = 'Name: ' + f.name_source + (f.unlock_source ? ' · Unlock info: ' + f.unlock_source : '');
+    const dl = document.getElementById('dl'), base = f.name.replace(/[^\w]+/g, '_');
+    dl.href = f.hires || f.file; dl.download = base + '.png';
+    const dl2 = document.getElementById('dl64'); dl2.hidden = !f.hires; dl2.href = f.file; dl2.download = base + '_64.png';
+    dlg.showModal();
+  }
+  document.getElementById('close').onclick = () => dlg.close();
+  dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+  const bg = document.getElementById('bg');
+  try { if (localStorage.getItem('wg2.flagBg') === 'none') bg.value = 'none'; } catch (e) {}
+  function applyBg() {
+    document.body.classList.toggle('bg-none', bg.value === 'none');
+    try { localStorage.setItem('wg2.flagBg', bg.value); } catch (e) {}
+  }
+  bg.addEventListener('change', applyBg); applyBg();
+  q.addEventListener('input', render);
+  document.getElementById('bonusOnly').addEventListener('change', render);
+  size.addEventListener('input', () => grid.style.setProperty('--cell', size.value + 'px'));
+  render();
+  const want = decodeURIComponent(location.hash.slice(1)), wf = want && flags.find(f => f.name === want);
+  if (wf) open(wf);
+})();
+</script>
+</body>
+</html>
+

@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ship Designer - Warship Gunner 2</title>
+<style>
+:root{--bg:#0b1d3a;--grid:#17335f;--ink:#e8f0ff;--dim:#7f9cc8;--accent:#53d6ff;--warn:#ffb347;--bad:#ff6b6b;--panel:#101f38}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#050d1c;color:var(--ink);font:14px/1.4 "Segoe UI",system-ui,sans-serif}
+#app{display:flex;flex-direction:column;height:100%;max-width:1400px;margin:0 auto}
+header{display:flex;gap:10px;align-items:center;padding:8px 12px;flex-wrap:wrap}
+.plate{background:linear-gradient(#8d949f,#5b616c);color:#dff6ff;font-weight:600;letter-spacing:.08em;padding:5px 22px 5px 14px;clip-path:polygon(0 0,100% 0,92% 100%,0 100%);text-shadow:0 1px 2px #000}
+select,button,input{background:var(--panel);color:var(--ink);border:1px solid #2b4a7e;border-radius:4px;padding:5px 8px;font:inherit}
+button{cursor:pointer}button:hover{border-color:var(--accent)}button.on{background:#1f4a86;border-color:var(--accent)}
+select{max-width:300px}
+#stage{position:relative;flex:1;min-height:300px;background:var(--bg)}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:none}
+#mode{position:absolute;top:6px;left:0;right:0;text-align:center;color:#c9d6ea;letter-spacing:.12em;pointer-events:none}
+#hud{display:grid;grid-template-columns:minmax(180px,1.1fr) 2fr 1.3fr;gap:0;background:#0a1730;border-top:2px solid #2b4a7e}
+#hud>div{padding:8px 12px}
+.hull{background:linear-gradient(#6c7380,#3a404b);display:flex;align-items:center;justify-content:space-between;font-weight:600;font-style:italic;gap:8px}
+.tag{background:#222a36;border-radius:3px;padding:1px 8px;font-style:normal;font-size:12px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 16px;align-items:baseline}
+.kv b{color:var(--accent);letter-spacing:.1em;font-weight:500}
+.kv span{text-align:right;font-variant-numeric:tabular-nums}
+.over{color:var(--bad)}.warn{color:var(--warn)}
+#keys{display:flex;flex-wrap:wrap;gap:4px 14px;padding:6px 12px;font-size:12px;color:var(--dim);background:#07112a}
+#keys kbd{background:#1b2c4a;border:1px solid #34527f;border-radius:3px;padding:0 5px;color:var(--ink)}
+#menu{position:absolute;top:0;right:0;bottom:0;width:min(380px,92%);background:rgba(8,18,38,.96);border-left:2px solid #2b4a7e;display:none;flex-direction:column;z-index:3}
+#menu.open{display:flex}
+#menu h3{margin:0;padding:10px 12px;font-weight:600;letter-spacing:.08em;border-bottom:1px solid #2b4a7e}
+#menu .tabs{display:flex;flex-wrap:wrap;gap:4px;padding:8px}
+#list{overflow:auto;padding:0 8px 12px;flex:1}
+.item{display:flex;justify-content:space-between;gap:8px;padding:5px 8px;border-radius:4px;cursor:pointer}
+.item:hover,.item.sel{background:#1b3563}
+.item small{color:var(--dim)}
+#note{padding:6px 12px;font-size:12px;color:var(--dim)}
+details{padding:0 12px 6px;font-size:12px;color:var(--dim)}
+details label{display:inline-flex;align-items:center;gap:6px;margin-right:12px}
+details input[type=range]{width:120px}
+</style></head><body>
+<div id="app">
+<header>
+  <div class="plate">CHANGE DESIGN</div>
+  <select id="design" title="Load a pre-assembled design (the game's 435 defaults and 95 secret blueprints)"></select>
+  <select id="hullSel" title="Change hull (parts stay where they are)"></select>
+  <select id="setSel" title="Which of the game's model sets draws the parts"><option value="H">Models: dock (high detail)</option><option value="L">Models: in-game (low detail)</option></select>
+  <select id="armorSel" title="Armor plating size"></select>
+  <button id="btnClear">New</button>
+  <button id="btnMenu">Menu (parts)</button>
+  <button id="btnShare" title="Copy a link to this design">Copy link</button>
+</header>
+<div id="stage"><canvas id="cv"></canvas><div id="mode">EDITING PART</div>
+  <div id="menu"><h3>PARTS</h3><div class="tabs" id="tabs"></div><div id="list"></div></div>
+</div>
+<details><summary>Hull fit (chosen, not decoded: 75 model units per cell, each hull centred on the x range of the game's own designs for it)</summary>
+  <label>cell size <input id="fCell" type="range" min="40" max="130" value="75"><span id="vCell"></span></label>
+  <label>hull shift <input id="fCx" type="range" min="40" max="100" value="70"><span id="vCx"></span></label>
+  <label>deck row <input id="fRow" type="range" min="10" max="34" value="25"><span id="vRow"></span></label>
+  <label><input type="checkbox" id="fFlip" checked> bow right (model faces -y)</label>
+</details>
+<div id="hud">
+  <div class="hull"><span id="hName">-</span><span class="tag" id="hTag">-</span></div>
+  <div class="kv" id="kv"></div>
+  <div class="kv" id="kv2"></div>
+</div>
+<div id="keys">
+  <span><kbd>Arrows</kbd> move cursor</span><span><kbd>Click</kbd>/<kbd>Space</kbd> place or grab</span><span><kbd>Del</kbd> delete</span>
+  <span><kbd>Ctrl+Z</kbd> undo</span><span><kbd>M</kbd> menu</span><span><kbd>Tab</kbd> cursor speed</span><span><kbd>R</kbd> turn 180</span>
+</div>
+<div id="note"></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  var D = null, IDX = {}, CHIPS = null, hullCache = {}, modelCache = {};
+  var state = { hull: 0, mounts: [], sel: -1, held: -1, cur: { gx: 70, gy: 24 }, speed: 1, mirror: true, armorIdx: 0, sysW: 0, sysSpd: 0, x200: 0, set: 'H', tool: null, family: 'main gun' };
+  var undo = [];
+  var cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  var $ = function (id) { return document.getElementById(id); };
+  var FAM_ORDER = ['forward bridge', 'aft bridge', 'smokestack', 'main gun', 'hi-angle gun', 'proto gun', 'rapid fire', 'machine gun', 'CIWS', 'torpedo', 'explosive', 'missile', 'rocket', 'facility', 'boiler', 'engine part'];
+  var SPEEDS = [1, 3, 6];
+  // Parts with a magazine / machinery box: their x span is the "vital part" length (VP). CIWS, machine guns, depth charges, facilities and bridges have none.
+  var MS = 1, DZ = 1;      // magazine box scale, level distance below which boxes collide (see notes/designer.md)
+  var VITAL = { 'main gun': 1, 'hi-angle gun': 1, 'proto gun': 1, 'rapid fire': 1, 'torpedo': 1, 'missile': 1, 'rocket': 1, 'boiler': 1, 'engine part': 1 };
+  var NOMIRROR = { 'forward bridge': 1, 'aft bridge': 1, 'smokestack': 1, 'boiler': 1, 'engine part': 1 };
+  function mirrorable(p) { return !NOMIRROR[p.family] && !/VLS/.test(p.label); }
+  // Mount geometry. y: a part whose anchor is within 3 cells of the centre line is a centre-line part (drawn centred on y 24); the others come in left / right pairs (anchors sum to 48 in the game's designs).
+  // Weapons with no fore / aft orientation (AA, hi-angle, torpedoes, rockets) face outward when they stand off the centre line.
+  var OUTWARD = { 'machine gun': 1, 'CIWS': 1, 'hi-angle gun': 1, 'torpedo': 1, 'rocket': 1, 'explosive': 1, 'main gun': 1, 'proto gun': 1, 'rapid fire': 1 };      // main guns only when off the centre line (the secondary battery)
+  // Centre-line parts: the anchor is the part's near edge, not its middle (46cm triple gun, 8 cells wide, anchored at y 20; the bridge likewise), so a part is on the centre line when anchor + half its width is about 24.
+  // The others come in pairs whose anchors sum to 48 and are drawn at their anchors.
+  function centred(mt) {
+    var p = D.parts[mt[0]], mm = pm(p) && modelCache[pm(p) + '#r'], w = mm ? 2 * Math.max(Math.abs(mm.mn[0]), Math.abs(mm.mx[0])) / fit().U : 0;
+    return Math.abs(mt[3] + w / 2 - 24) <= 2.5 || Math.abs(mt[3] - 24) <= 1;
+  }
+  function outward(mt) { return OUTWARD[D.parts[mt[0]].family] && !centred(mt) ? (mt[3] < 24 ? -1 : 1) : 0; }
+  function ey(mt) { var f = D.parts[mt[0]].family; return (f === 'boiler' || f === 'engine part') ? mt[3] : centred(mt) ? 24 : mt[3]; }     // engine boxes keep their anchors (their sizes come from the spacing of those anchors)     // engine boxes keep their anchors (their sizes come from the spacing of those anchors)
+  // Vertical: level + part height is about the deck row for guns / AA (flush on the deck), so parts sit flush on the deck unless the level puts them clearly above it (more than 6 rows: raised on a tower).
+  function ringOf(mt, model) { return isGun(D.parts[mt[0]]) && model.ring ? model.ring : model.mn[2]; }      // gun turrets: the body starts above the ring
+  function baseRow(mt, model) {
+    var U = fit().U, deck = fit().row, h = (model.mx[2] - ringOf(mt, model)) / U, base = mt[2] + h;
+    if (base < deck - 6) return base;
+    // Superfiring turrets: a gun whose level is 2 or more rows above the lowest mount of the same part sits that many rows higher, so it clears the turret in front of it.
+    if (isGun(D.parts[mt[0]]) && model.ring > model.mn[2]) {
+      var lo = 0; state.mounts.forEach(function (o) { if (o[0] === mt[0] && o[4] === mt[4] && o[2] > lo) lo = o[2]; });
+      if (lo - mt[2] >= 2) return deck - (lo - mt[2]);      // raised by the level difference itself (one row = one cell); a full ring height was too high
+    }
+    return deck;
+  }
+  // Vital box of a magazine / machinery part: a RECTANGLE (grid cells) from the part model's footprint, centred on the mount (the game's real shape table is not located; engine parts without a model get a 5 x 5 box).
+  function vbox(mt) {
+    var p = D.parts[mt[0]], mm = p && pm(p) && modelCache[pm(p) + '#r'], U = fit().U;
+    var lx = p.fp ? p.fp[0] : mm ? MS * (mm.mx[1] - mm.mn[1]) / U : 5, ly = p.fp ? p.fp[1] : mm ? MS * (mm.mx[0] - mm.mn[0]) / U : 5;     // engine parts: closest spacing in the game's own designs (builder)
+    if (outward(mt)) { var t = lx; lx = ly; ly = t; }      // a part facing outward is turned 90 degrees
+    return { x0: mt[1] - lx / 2, x1: mt[1] + lx / 2, y0: ey(mt) - ly / 2, y1: ey(mt) + ly / 2 };
+  }
+  // Engines / boilers / turbines sit under the deck in the hull and collide with the magazines under the big guns (and with each other).
+  function isEng(mt) { var f = D.parts[mt[0]].family; return f === 'boiler' || f === 'engine part'; }
+  function collides(mt, skip) {
+    if (!VITAL[D.parts[mt[0]].family]) return false;
+    var a = vbox(mt), e = isEng(mt), eps = 0.01;
+    return state.mounts.some(function (o, i) {
+      if (i === skip || o === mt || !VITAL[D.parts[o[0]].family] || !(e || isEng(o)) || Math.abs(o[2] - mt[2]) >= DZ) return false;     // different levels (rows) do not collide
+      var b = vbox(o); return a.x0 < b.x1 - eps && b.x0 < a.x1 - eps && a.y0 < b.y1 - eps && b.y0 < a.y1 - eps;
+    });
+  }
+  // ---- The game's own design-screen formulas (decoded from SLUS_213.87, tools/designer_vp.py / designer_stats.py; each checked on all 530 stock designs, see notes/designer_code.md) ----
+  var SH = null;      // shape table from designer_sprites/index.json: picture shape i -> {w, h, x0, y0, bw, bh} in cells
+  function shape(i) { var p = SH && SH.pictures[i]; if (!p) return null; var m = p.margins; return { w: p.fw, h: p.fh, x0: m[0], y0: m[1], bw: m[2], bh: m[3] }; }
+  function rotBox(s, rot, flag) {      // 0x1a5bc0: rotation 0 / 90 / 180 / 270 clockwise, flag 1 = flip y, 2 = flip x
+    var w = s.w, h = s.h, x0 = s.x0, y0 = s.y0, bw = s.bw, bh = s.bh, t;
+    if (rot === 1) { t = [h, w, h - (y0 + bh), x0, bh, bw]; } else if (rot === 2) { t = [w, h, w - (x0 + bw), h - (y0 + bh), bw, bh]; } else if (rot === 3) { t = [h, w, y0, w - (x0 + bw), bh, bw]; } else t = [w, h, x0, y0, bw, bh];
+    w = t[0]; h = t[1]; x0 = t[2]; y0 = t[3]; bw = t[4]; bh = t[5];
+    if (flag & 1) y0 = h - (y0 + bh); if (flag & 2) x0 = w - (x0 + bw);
+    return { w: w, h: h, x0: x0, y0: y0, bw: bw, bh: bh };
+  }
+  function facing(b13, b14) { if (b13) return [2, 0]; if (b14 === 1) return [0, 1]; if (b14 === 2) return [3, 0]; return [b14 === 3 ? 1 : 0, 0]; }      // 0x1a5b70
+  function barrelsOf(m) { return (m[4] >> 8) + 1; }
+  function vp() {      // VP%: span of the vital parts' magazine boxes and pictures along the ship / hull length (0x19b650, 530 / 530 stock designs)
+    var H = D.hulls[state.hull], lo = 160, hi = 0, any = false;
+    state.mounts.forEach(function (m) {
+      var p = D.parts[m[0]]; if (!p || !p.vital) return;
+      var mi = p.mag && p.mag[m[5]], pi = p.pic && p.pic[barrelsOf(m) - 1], ms = shape(mi), ps = shape(pi); if (!ms || !ps) return;
+      any = true; var a = rotBox(ms, 0, m[6] ? 2 : 0), l = m[1] + a.x0, h = l + (a.bw || a.w) - 1, f = facing(m[6], m[7]), b = rotBox(ps, f[0], f[1]), h2 = l + (b.bw || b.w);
+      lo = Math.min(lo, l, m[1] + b.x0); hi = Math.max(hi, h, h2);
+    });
+    if (!any || hi < lo) return { pct: 0, x0: 0, x1: 0, len: H.L };
+    return { pct: Math.floor((hi - lo + 1) * 100 / H.L), x0: lo, x1: hi + 1, len: H.L };
+  }
+  function armorInfo() {      // armor weight = plating[idx] x 2 x VP / 100, x 80 / 100 when VP < 54 (core; full from 54)
+    var v = vp(), idx = state.armorIdx, w = 0;
+    if (idx > 0 && v.pct > 0) { w = Math.floor(D.plating[idx] * 2 * v.pct / 100); if (v.pct < 54) w = Math.floor(w * 80 / 100); }
+    return { v: v, core: v.pct < 54, cm: D.armorSize[idx], w: w };
+  }
+  function stats() {      // weight and speed (0x19bbe8, 530 / 530 stock designs)
+    var H = D.hulls[state.hull], parts = 0, i;
+    state.mounts.forEach(function (m) { var p = D.parts[m[0]]; if (p && p.wb4) parts += p.wb4[Math.min(5, barrelsOf(m) - 1)] || 0; });
+    var ar = armorInfo(), weight = H.hwg + parts + state.sysW + ar.w + (state.x200 ? 200 : 0);
+    function group(cat) { var g = {}, order = []; state.mounts.forEach(function (m) { if ((m[4] & 255) !== cat) return; var k = m[0] + '|' + barrelsOf(m); if (!(k in g)) { g[k] = 0; order.push(k); } g[k]++; }); return order.map(function (k) { return [+k.split('|')[0], g[k]]; }); }
+    var bo = group(10), tu = group(11), hp = 0, speed = 0;
+    if (bo.length) {
+      var b = D.parts[bo[0][0]], nb = bo[0][1], eff = 0;
+      if (b.kind === 0x17) eff = b.eff; else if (tu.length) eff = D.parts[tu[0][0]].eff * tu[0][1];
+      hp = Math.floor(b.out * nb * eff / 100);
+      if (hp > 0) {
+        var t = Math.floor(hp / weight * 10); if (b.kind === 0x15) t = Math.floor(t * 12 / 10); t = Math.max(1, Math.min(256, t));
+        speed = t * ((100 - D.curve[t] / 100) / 100); speed += speed * state.sysSpd / 100;
+      }
+    }
+    return { weight: weight, speed: speed, parts: parts, armor: ar };
+  }
+  // Hull bounds: half-width (cells from the centre line y 24) of the hull's plan outline at every x cell, from the hull model; -1 = off the hull.
+  var hwCache = {};
+  function hullHW() {
+    var F = fit(), H = D.hulls[state.hull], key = state.hull + '|' + JSON.stringify(F), r = hwCache[key]; if (r) return r;
+    var m = modelCache[H.model + '#r']; if (!m) return null;
+    var tf = tfHull(m, 'plan', F), hw = [], i; for (i = 0; i <= 150; i++) hw.push(-1);
+    m.quads.forEach(function (q) {
+      var P = q.map(function (v) { var p = tf(v); return { gx: (p.sx - layout.X0) / layout.C, gy: (p.sy - layout.PY0) / layout.C }; });
+      var a = Math.floor(Math.min.apply(null, P.map(function (p) { return p.gx; }))), b = Math.ceil(Math.max.apply(null, P.map(function (p) { return p.gx; }))), w = Math.max.apply(null, P.map(function (p) { return Math.abs(p.gy - 24); }));
+      for (var x = Math.max(0, a); x <= Math.min(150, b); x++) if (w > hw[x]) hw[x] = w;
+    });
+    return hwCache[key] = hw;
+  }
+  function clampToHull(gx, gy) {      // keep a part on the hull: x inside the hull, |y - 24| no wider than the hull at that x
+    var hw = hullHW(); if (!hw) return { gx: gx, gy: gy };
+    var xs = []; hw.forEach(function (w, x) { if (w >= 0) xs.push(x); });
+    if (xs.length) gx = Math.max(xs[0], Math.min(xs[xs.length - 1], gx));
+    var w = Math.max(0, hw[gx]) + 3; if (Math.abs(gy - 24) > w) gy = 24 + (gy < 24 ? -w : w);
+    return { gx: gx, gy: Math.round(gy) };
+  }
+  function modelLen(H) { var m = IDX[H.model]; return m ? m.size[1] / fit().U : 0; }
+  var MAXP = 100;
+  var layout = { C: 7, X0: 0, PY0: 0, SY0: 0 };
+
+  // Model set for parts: the dock models (mdt_weph_N, 'H') or the in-game low-detail ones (mdt_wepl_N, 'L'); the hull always uses its own model.
+  function pm(p) { if (!p.model) return null; var id = state.set === 'L' ? p.model.replace('weph', 'wepl') : p.model; return IDX[id] ? id : p.model; }
+  function fit() { return { U: +$('fCell').value, cx: +$('fCx').value, row: +$('fRow').value, flip: $('fFlip').checked }; }
+  function mbuf(id) {
+    if (modelCache[id]) return modelCache[id];
+    return modelCache[id] = fetch('models/' + id + '.bin').then(function (r) { return r.arrayBuffer(); }).then(function (buf) {
+      var m = IDX[id], dv = new DataView(buf), off = 0, quads = [];
+      m.parts.forEach(function (p) {
+        if (p.kind === 'mesh' && p.slot !== 12) {
+          var qo = off + p.v * 12;
+          for (var k = 0; k < p.q; k++) {
+            var q = [0, 1, 2, 3].map(function (j) { var vi = dv.getUint16(qo + (k * 4 + j) * 2, true); return [dv.getFloat32(off + vi * 12, true), dv.getFloat32(off + vi * 12 + 4, true), dv.getFloat32(off + vi * 12 + 8, true)]; });
+            quads.push(q);
+          }
+        }
+        off += p.v * 12 + p.q * 24;
+      });
+      var mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
+      quads.forEach(function (q) { q.forEach(function (v) { for (var i = 0; i < 3; i++) { if (v[i] < mn[i]) mn[i] = v[i]; if (v[i] > mx[i]) mx[i] = v[i]; } }); });
+      // Turret ring (barbette): the narrow column under the turret body. ringTop = the first height where the horizontal radius grows more than 20% over the lowest level; below it the ring is sunk into the hull.
+      var rz = {}; quads.forEach(function (q) { q.forEach(function (v) { var k = Math.round(v[2]), r = Math.sqrt(v[0] * v[0] + v[1] * v[1]); if (!(k in rz) || r > rz[k]) rz[k] = r; }); });
+      var lv = Object.keys(rz).map(Number).sort(function (a, b) { return a - b; }), ring = 0;
+      if (lv.length > 2) { var r0 = rz[lv[0]]; for (var i = 1; i < lv.length; i++) if (rz[lv[i]] > 1.2 * r0) { ring = lv[i]; break; } }
+      if (ring - mn[2] > (mx[2] - mn[2]) * 0.8) ring = 0;
+      // Main deck height: the height with the most upward-facing surface area in the upper half (the hull model also has raised forecastle / barbette blocks above it).
+      var ar = {}; quads.forEach(function (q) {
+        var ux = q[1][0] - q[0][0], uy = q[1][1] - q[0][1], uz = q[1][2] - q[0][2], wx = q[2][0] - q[0][0], wy = q[2][1] - q[0][1], wz = q[2][2] - q[0][2];
+        var nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx, nl = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+        if (Math.abs(nz) / nl > 0.95 && q[0][2] > mn[2] + (mx[2] - mn[2]) * 0.4) { var k = Math.round(q[0][2] / 15) * 15; ar[k] = (ar[k] || 0) + nl; }
+      });
+      var deckZ = mx[2], best = 0; Object.keys(ar).forEach(function (k) { if (ar[k] > best) { best = ar[k]; deckZ = +k; } });
+      return { quads: quads, mn: mn, mx: mx, ring: ring, deckZ: deckZ };
+    }).catch(function () { return null; });
+  }
+
+  /* model point -> grid cells. Model axes (as in the viewers): x across, y along the ship, z up.
+     Hull: centred on the fit's centre (grid x, y 24) and deck row. Parts: origin at their anchor, +y = bow, bow = increasing grid x unless flipped. */
+  // Feature edges: the game's blueprint shows outlines and creases, not every triangle edge. An edge is drawn when it is an open border, a crease (the two faces differ by more than ~20 degrees)
+  // or a silhouette in the view (one face towards the viewer and the other away). Computed once per quad list for the plan view (looking down z) and the side view (looking along x).
+  function featEdges(quads) {
+    if (quads.feat) return quads.feat;
+    var key = function (v) { return Math.round(v[0] / 2) + ',' + Math.round(v[1] / 2) + ',' + Math.round(v[2] / 2); }, em = {}, N = [];
+    quads.forEach(function (q, f) {
+      var a = q[0], b = q[1], c = q[2], ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], wx = c[0] - a[0], wy = c[1] - a[1], wz = c[2] - a[2];
+      var nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx, l = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1; N.push([nx / l, ny / l, nz / l]);
+      for (var e = 0; e < 4; e++) { var k1 = key(q[e]), k2 = key(q[(e + 1) % 4]); if (k1 === k2) continue; var k = k1 < k2 ? k1 + '|' + k2 : k2 + '|' + k1; (em[k] = em[k] || []).push([f, e]); }
+    });
+    var plan = quads.map(function () { return [0, 0, 0, 0]; }), side = quads.map(function () { return [0, 0, 0, 0]; });
+    Object.keys(em).forEach(function (k) {
+      var L = em[k];
+      if (L.length !== 2) { L.forEach(function (x) { plan[x[0]][x[1]] = 1; side[x[0]][x[1]] = 1; }); return; }
+      var A = N[L[0][0]], B = N[L[1][0]], dot = A[0] * B[0] + A[1] * B[1] + A[2] * B[2];
+      var crease = dot < 0.94, sp = A[2] * B[2] < 0, ss = A[0] * B[0] < 0;
+      L.forEach(function (x) { if (crease || sp) plan[x[0]][x[1]] = 1; if (crease || ss) side[x[0]][x[1]] = 1; });
+    });
+    return quads.feat = { plan: plan, side: side };
+  }
+  function drawQuads(g, quads, tf, view, bg) {
+    var feat = featEdges(quads)[view];
+    var arr = quads.map(function (q, i) { var P = q.map(tf); var d = view === 'plan' ? (P[0].z + P[1].z + P[2].z + P[3].z) : (P[0].y + P[1].y + P[2].y + P[3].y); return { P: P, d: d, f: feat[i] }; });
+    arr.sort(function (a, b) { return a.d - b.d; });
+    g.fillStyle = bg; g.strokeStyle = '#e9f2ff'; g.lineWidth = 0.9; g.lineJoin = 'round';
+    arr.forEach(function (o) {
+      g.beginPath(); o.P.forEach(function (p, i) { if (i) g.lineTo(p.sx, p.sy); else g.moveTo(p.sx, p.sy); }); g.closePath(); g.fill();
+      g.beginPath(); for (var e = 0; e < 4; e++) if (o.f[e]) { var p1 = o.P[e], p2 = o.P[(e + 1) % 4]; g.moveTo(p1.sx, p1.sy); g.lineTo(p2.sx, p2.sy); } g.stroke();
+    });
+  }
+  function tfHull(h, view, F) {
+    var U = F.U, s = F.flip ? -1 : 1, mcx = (h.mn[0] + h.mx[0]) / 2, mcy = (h.mn[1] + h.mx[1]) / 2, zt = h.deckZ, C = layout.C, xr = D.hulls[state.hull].xr, cx = (xr[0] + xr[1]) / 2 + (F.cx - 70);
+    return function (v) {
+      var gx = cx + s * (v[1] - mcy) / U, gy = 24 + v[0] / U, gz = F.row + (zt - v[2]) / U;
+      return view === 'plan' ? { sx: layout.X0 + gx * C, sy: layout.PY0 + gy * C, z: v[2], y: v[1] } : { sx: layout.X0 + gx * C, sy: layout.SY0 + gz * C, z: v[2], y: v[0] };
+    };
+  }
+  function tfPart(model, mt, view, F) {
+    var U = F.U, s = F.flip ? -1 : 1, C = layout.C, aft = mt[6] === 1 ? -1 : 1;
+    var pcx = (model.mn[0] + model.mx[0]) / 2, pcy = (model.mn[1] + model.mx[1]) / 2, base = baseRow(mt, model), zb = ringOf(mt, model);
+    var out = outward(mt), Fx = out ? 0 : aft, Fy = out ? out : 0, Rx = -Fy, Ry = Fx;      // facing in the grid: along the ship, or outward (-1 = up in the plan, +1 = down) for side-mounted AA-type weapons; R = F turned 90 degrees
+    return function (v) {      // the part's base sits on the deck (flush) unless its level puts it clearly above it; centre-line parts are centred on y 24
+      var a = s * (v[1] - pcy) / U, b = v[0] / U;      // a: along the model's forward axis; b: across it, from the model's own axis (x = 0), not the middle of its bounding box
+      var dx = a * Fx + b * Rx, dy = a * Fy + b * Ry;
+      var gx = mt[1] + dx, gy = ey(mt) + dy, gz = base - (v[2] - zb) / U;
+      return view === 'plan' ? { sx: layout.X0 + gx * C, sy: layout.PY0 + gy * C, z: v[2], y: v[1] } : { sx: layout.X0 + gx * C, sy: layout.SY0 + gz * C, z: v[2], y: v[0] };
+    };
+  }
+
+  var hullLayer = {}, dirty = true;
+  function renderHull(view) {
+    var F = fit(), H = D.hulls[state.hull], key = state.hull + view + JSON.stringify(F) + cv.width + 'x' + cv.height;
+    if (hullLayer.key === key + view && hullLayer[view]) return;
+    var mk = function (w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+    return mbuf(H.model).then(function (m) {
+      if (!m) return; modelCache[H.model + '#r'] = m;
+      var c = mk(cv.width, cv.height), g = c.getContext('2d'); g.scale(dpr(), dpr());
+      drawQuads(g, m.quads, tfHull(m, view, F), view, '#0b1d3a');
+      hullLayer[view] = c; hullLayer.key = key + view; hullLayer['k' + view] = key; dirty = true; draw();
+    });
+  }
+  function dpr() { return window.devicePixelRatio || 1; }
+
+
+  function resize() {
+    var r = cv.parentNode.getBoundingClientRect(), d = dpr();
+    cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d);
+    var W = r.width, Hh = r.height; layout.C = W / 150; layout.X0 = 0;
+    layout.SY0 = Hh * 0.08; layout.PY0 = Hh * 0.52 - 8 * layout.C; hullLayer = {}; dirty = true; refreshHull(); draw();
+  }
+  function refreshHull() { if (!D) return; Promise.all([renderHull('plan'), renderHull('side')]); }
+
+  var spriteCache = {};
+  function drawPart(g, mt, hi, view) {
+    var p = D.parts[mt[0]], F = fit(), col = hi ? '#ffe45c' : '#e9f2ff';
+    var fam = p && p.family, C = layout.C;
+    var mm = p && pm(p) && (modelCache[pm(p) + '#r'] || null);
+    if (mm) {
+      var zr = ringOf(mt, mm), qs = zr > mm.mn[2] ? (mm.qd || (mm.qd = {}))[zr] || (mm.qd[zr] = mm.quads.filter(function (q) { return Math.max(q[0][2], q[1][2], q[2][2], q[3][2]) > zr + 1; })) : mm.quads;     // the ring is hidden (sunk into the hull)
+      g.save(); drawQuads(g, qs, tfPart(mm, mt, view, F), view, '#0b1d3a'); g.restore();
+      if (hi) { g.strokeStyle = '#ffe45c'; g.lineWidth = 1.5; box(g, mt, view, mm, F); }
+    } else {
+      var gx = mt[1], gy = ey(mt), gz = mt[2], sx = layout.X0 + gx * C, sy = view === 'plan' ? layout.PY0 + gy * C : layout.SY0 + gz * C;
+      g.strokeStyle = col; g.lineWidth = 1.4; var r = 1.2 * C; g.strokeRect(sx - r, sy - r, 2 * r, 2 * r);
+    }
+    if (fam && VITAL[fam]) {      // vital box: a rectangle in both views (orange; yellow when selected)
+      var b = vbox(mt); g.strokeStyle = collides(mt) ? '#ff5a5a' : hi ? '#ffe45c' : fam === 'engine part' ? '#5fe3ff' : '#ffb02e'; g.lineWidth = hi ? 2 : 1.4;      // boilers and magazines orange, turbines / engine parts cyan (as in the game)
+      if (view === 'plan') g.strokeRect(layout.X0 + b.x0 * C, layout.PY0 + b.y0 * C, (b.x1 - b.x0) * C, (b.y1 - b.y0) * C);
+      else {      // side view: engines at their own level rows (below the deck, inside the hull); magazines just under the part's base
+        var hm = modelCache[D.hulls[state.hull].model + '#r'], keel = hm ? fit().row + (hm.deckZ - hm.mn[2]) / fit().U : 34;
+        var top = isEng(mt) ? keel - 3 - Math.max(0, 29 - mt[2]) : (mm ? baseRow(mt, mm) : fit().row);      // engines sit along the bottom of the hull (the lower the level number, the higher the tier)
+        var rows = isEng(mt) ? 4.5 : 3; if (isEng(mt)) top = keel - rows - Math.max(0, 29 - mt[2]);
+        g.strokeRect(layout.X0 + b.x0 * C, layout.SY0 + top * C, (b.x1 - b.x0) * C, rows * C);
+      }
+    }
+  }
+  function box(g, mt, view, mm, F) {
+    var tf = tfPart(mm, mt, view, F), xs = [], ys = [];
+    mm.quads.forEach(function (q) { q.forEach(function (v) { var P = tf(v); xs.push(P.sx); ys.push(P.sy); }); });
+    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+    g.strokeRect(x0 - 2, y0 - 2, x1 - x0 + 4, y1 - y0 + 4);
+  }
+
+  function draw() {
+    if (!D) return; var d = dpr(), W = cv.width / d, Hh = cv.height / d;
+    ctx.setTransform(d, 0, 0, d, 0, 0); ctx.fillStyle = '#0b1d3a'; ctx.fillRect(0, 0, W, Hh);
+    // blueprint grid
+    ctx.strokeStyle = '#13294f'; ctx.lineWidth = 1; var C = layout.C;
+    ctx.beginPath(); for (var x = 0; x <= 150; x++) { var px = Math.round(x * C) + .5; ctx.moveTo(px, 0); ctx.lineTo(px, Hh); }
+    for (var y = 0; y * C < Hh; y++) { var py = Math.round(y * C) + .5; ctx.moveTo(0, py); ctx.lineTo(W, py); } ctx.stroke();
+    ctx.strokeStyle = '#1d3d73'; ctx.beginPath(); for (x = 0; x <= 150; x += 10) { px = Math.round(x * C) + .5; ctx.moveTo(px, 0); ctx.lineTo(px, Hh); } for (y = 0; y * C < Hh; y += 10) { py = Math.round(y * C) + .5; ctx.moveTo(0, py); ctx.lineTo(W, py); } ctx.stroke();
+    ['plan', 'side'].forEach(function (v) { if (hullLayer[v]) ctx.drawImage(hullLayer[v], 0, 0, W, Hh); });
+    // parts: side view then plan view
+    var order = state.mounts.map(function (m, i) { return i; }).sort(function (a, b) { return state.mounts[b][2] - state.mounts[a][2]; });
+    ['side', 'plan'].forEach(function (v) { order.forEach(function (i) { drawPart(ctx, state.mounts[i], i === state.sel, v); }); });
+    // cursor
+    var cx = layout.X0 + state.cur.gx * C, cy = layout.PY0 + state.cur.gy * C;
+    ctx.strokeStyle = '#4aa8ff'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, Hh); ctx.moveTo(0, cy); ctx.lineTo(W, cy); ctx.stroke();
+    if (state.tool && Math.abs(state.cur.gy - 24) > 1) { var my = layout.PY0 + (48 - state.cur.gy) * C; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(0, my); ctx.lineTo(W, my); ctx.stroke(); ctx.setLineDash([]); }
+    // VP bar: x span of the vital parts (magazines / machinery)
+    var V = vp();
+    if (V.len && V.x1 > V.x0) {
+      ctx.strokeStyle = '#d96a6a'; ctx.lineWidth = 3; var yy = Math.min(layout.PY0 + 52 * C, Hh - 14); ctx.beginPath(); ctx.moveTo(V.x0 * C, yy); ctx.lineTo(V.x1 * C, yy); ctx.stroke();
+      ctx.fillStyle = '#c9a4d8'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('VP:' + V.pct + '%', (V.x0 + V.x1) / 2 * C, yy - 8);
+    }
+    hud();
+  }
+  function hud() {
+    var H = D.hulls[state.hull], S = stats(), total = S.weight, cls = /Battlecarrier/.test(H.name) ? 'BC' : /Battleship/.test(H.name) ? 'BB' : /Cruiser/.test(H.name) ? 'CA' : /Carrier/.test(H.name) ? 'CV' : /Destroyer/.test(H.name) ? 'DD' : /Sub/.test(H.name) ? 'SS' : /Frigate/.test(H.name) ? 'FF' : '--';
+    $('hName').textContent = H.name; $('hTag').textContent = cls;
+    var over = total > H.mwg, np = state.mounts.length, cnt = state.mounts.filter(function (m) { var f = D.parts[m[0]].family; return f !== 'boiler' && f !== 'engine part'; }).length;
+    $('kv').innerHTML = '<b>WEIGHT LIMIT</b><span class="' + (over ? 'over' : '') + '">' + total + ' / ' + H.mwg + 't</span><b>HULL WEIGHT</b><span>' + H.hwg + 't</span><b>ARMOR RATING</b><span title="Core below 54% VP, Full from 54%. Armor weight = plating x 2 x VP% / 100 (x 0.8 if core): decoded from the game.">' + (state.armorIdx ? S.armor.cm + 'cm ' + (S.armor.core ? 'Core' : 'Full') + ' (' + S.armor.w + 't)' : 'none') + '</span><b>ENDURANCE</b><span>' + H.en + '</span>';
+    $('kv2').innerHTML = '<b>PARTS MAX</b><span class="' + (np > MAXP ? 'over' : '') + '">' + np + '/' + MAXP + '</span><b>SYSTEM SLOTS</b><span>' + H.ss + '</span><b>SPEED</b><span title="Decoded from the game: engine output x efficiency / weight through the speed curve; max 64.6 kt before systems">' + (S.speed ? S.speed.toFixed(1) + 'kt' : '-') + '</span>';
+    var s = state.sel >= 0 && state.mounts[state.sel]; var note = '';
+    if (s) { var p = D.parts[s[0]]; note = 'Selected: ' + p.label + (isGun(p) ? ' x' + ((s[4] >> 8) + 1) : '') + ' - ' + (p.wb ? p.wb[Math.min(3, s[4] >> 8)] + 't' : p.weight != null ? p.weight + 't' : 'weight ?') + ' - cell (' + s[1] + ', ' + s[3] + '), level ' + s[2]; }
+    else note = 'Cursor cell (' + state.cur.gx + ', ' + state.cur.gy + ')' + (state.tool ? ' - placing: ' + D.parts[state.tool[0]].label + ' x' + (isGun(D.parts[state.tool[0]]) ? (state.tool[4] >> 8) + 1 : 1) : ' - pick a part from Menu to place it');
+    $('note').textContent = note;
+    $('mode').textContent = state.held >= 0 ? 'MOVING PART' : state.tool ? 'PLACING PART' : 'EDITING PART';
+  }
+  function isGun(p) { return ['main gun', 'hi-angle gun', 'machine gun', 'torpedo', 'proto gun', 'rapid fire'].indexOf(p.family) >= 0; }
+
+  // ---------- data / UI ----------
+  function loadModels() {
+    var need = {}; state.mounts.forEach(function (m) { var p = D.parts[m[0]]; if (p && pm(p)) need[pm(p)] = 1; });
+    return Promise.all(Object.keys(need).map(function (id) { return mbuf(id).then(function (r) { modelCache[id + '#r'] = r; }); })).then(draw);
+  }
+  function setDesign(n) {
+    var ds = D.designs[n]; pushUndo(); state.hull = ds.hull; state.armorIdx = ds.armor; state.sysW = ds.sysW; state.sysSpd = ds.sysSpd; state.x200 = ds.x200; $('armorSel').value = ds.armor; state.mounts = ds.mounts.map(function (m) { return m.slice(); }); state.sel = -1; state.held = -1; state.tool = null;
+    $('design').value = n; $('hullSel').value = state.hull; hullLayer = {}; refreshHull(); loadModels().then(draw); draw();
+  }
+  function pushUndo() { undo.push(JSON.stringify({ h: state.hull, m: state.mounts })); if (undo.length > 80) undo.shift(); }
+  function doUndo() { var s = undo.pop(); if (!s) return; s = JSON.parse(s); state.hull = s.h; state.mounts = s.m; state.sel = -1; state.held = -1; $('hullSel').value = state.hull; hullLayer = {}; refreshHull(); loadModels(); draw(); }
+
+  var palette = {};
+  function buildPalette() {
+    var cnt = {};
+    D.designs.forEach(function (d) { d.mounts.forEach(function (m) { var k = m[0] + '|' + m[4]; var e = cnt[k] || (cnt[k] = { m: m, n: 0, z: {} }); e.n++; e.z[m[2]] = (e.z[m[2]] || 0) + 1; }); });
+    Object.keys(cnt).forEach(function (k) {
+      var e = cnt[k], zbest = +Object.keys(e.z).sort(function (a, b) { return e.z[b] - e.z[a]; })[0], p = D.parts[e.m[0]]; if (!p) return;
+      (palette[p.family] = palette[p.family] || []).push({ part: e.m[0], w: e.m[4], z: zbest, flags: e.m.slice(5), n: e.n, label: p.label });
+    });
+    Object.keys(palette).forEach(function (f) { palette[f].sort(function (a, b) { return a.label < b.label ? -1 : a.label > b.label ? 1 : a.w - b.w; }); });
+  }
+  function renderMenu() {
+    var tabs = $('tabs'); tabs.innerHTML = '';
+    FAM_ORDER.forEach(function (f) { if (!palette[f]) return; var b = document.createElement('button'); b.textContent = f; if (f === state.family) b.className = 'on'; b.onclick = function () { state.family = f; renderMenu(); }; tabs.appendChild(b); });
+    var l = $('list'); l.innerHTML = '';
+    (palette[state.family] || []).forEach(function (e) {
+      var d = document.createElement('div'), p = D.parts[e.part]; d.className = 'item' + (state.tool && state.tool[0] === e.part && state.tool[4] === e.w ? ' sel' : '');
+      var bar = isGun(p) ? ' x' + ((e.w >> 8) + 1) : '';
+      d.innerHTML = '<span>' + e.label + bar + '</span><small>' + (p.wb ? p.wb[Math.min(3, e.w >> 8)] + 't' : p.weight != null ? p.weight + 't' : '') + '</small>';
+      d.onclick = function () { state.tool = [e.part, state.cur.gx, e.z, state.cur.gy, e.w].concat(e.flags); state.sel = -1; loadModels(); renderMenu(); $('menu').classList.remove('open'); draw(); };
+      l.appendChild(d);
+    });
+  }
+
+  function hit(gx, gy) {
+    var best = -1, bd = 1e9;
+    state.mounts.forEach(function (m, i) { var d = Math.abs(m[1] - gx) + Math.abs(m[3] - gy); if (d < bd) { bd = d; best = i; } });
+    return bd <= 4 ? best : -1;
+  }
+  function place() {
+    if (state.held >= 0) { state.held = -1; draw(); return; }
+    if (state.tool) {
+      pushUndo(); var m = state.tool.slice(), c = clampToHull(state.cur.gx, state.cur.gy), p0 = D.parts[m[0]];
+      if (Math.abs(c.gy - 24) <= 1) c.gy = 24;      // on the centre line: one part at y 24
+      m[1] = c.gx; m[3] = c.gy; state.mounts.push(m);
+      if (Math.abs(c.gy - 24) > 1 && mirrorable(p0)) {      // anywhere else: always a left / right pair (only VLS and the like stay single)
+        var mm = m.slice(); mm[3] = 48 - m[3];
+        if (m[8] !== 0) { m[8] = state.cur.gy < 24 ? 1 : 2; m[7] = m[8] === 1 ? 1 : 0; mm[8] = 3 - m[8]; mm[7] = mm[8] === 1 ? 1 : 0; }     // the game's pairs (Yamato): y 14 -> side byte 1 with the byte before it 1; y 34 -> side 2 with 0
+        state.mounts.push(mm);
+      }
+      draw(); return;
+    }
+    var h = hit(state.cur.gx, state.cur.gy); state.sel = h; if (h >= 0) state.held = h; draw();
+  }
+  function moveHeld() {
+    if (state.held < 0) return; var m = state.mounts[state.held], c = clampToHull(state.cur.gx, state.cur.gy); m[1] = c.gx; m[3] = Math.abs(c.gy - 24) <= 1 ? 24 : c.gy;
+  }
+  function del() { if (state.sel < 0) return; pushUndo(); state.mounts.splice(state.sel, 1); state.sel = -1; state.held = -1; draw(); }
+
+  function cellOf(ev) {
+    var r = cv.getBoundingClientRect(), C = layout.C, gx = Math.round((ev.clientX - r.left - layout.X0) / C), gy = Math.round((ev.clientY - r.top - layout.PY0) / C);
+    return { gx: Math.max(0, Math.min(150, gx)), gy: Math.max(0, Math.min(48, gy)) };
+  }
+  cv.addEventListener('mousemove', function (e) {
+    var c = cellOf(e), step = SPEEDS[state.speed]; if (step > 1) { c.gx = Math.round(c.gx / step) * step; c.gy = Math.round(c.gy / step) * step; }
+    // the top half is the side view: only x changes there
+    var r = cv.getBoundingClientRect(); if (e.clientY - r.top < layout.PY0 - 10) c.gy = state.cur.gy;
+    state.cur = c; moveHeld(); draw();
+  });
+  cv.addEventListener('mousedown', function (e) { if (e.button !== 0) return; var c = cellOf(e), r = cv.getBoundingClientRect(); if (e.clientY - r.top < layout.PY0 - 10) c.gy = state.cur.gy; state.cur = c; moveHeld(); place(); });
+  cv.addEventListener('contextmenu', function (e) { e.preventDefault(); state.tool = null; state.held = -1; state.sel = -1; draw(); });
+  window.addEventListener('keydown', function (e) {
+    if (/INPUT|SELECT/.test(document.activeElement.tagName)) return;
+    var s = SPEEDS[state.speed], k = e.key;
+    if (k === 'ArrowLeft') state.cur.gx = Math.max(0, state.cur.gx - s); else if (k === 'ArrowRight') state.cur.gx = Math.min(150, state.cur.gx + s);
+    else if (k === 'ArrowUp') state.cur.gy = Math.max(0, state.cur.gy - s); else if (k === 'ArrowDown') state.cur.gy = Math.min(48, state.cur.gy + s);
+    else if (k === ' ' || k === 'Enter') place(); else if (k === 'Delete' || k === 'Backspace') del();
+    else if (k === 'Tab') state.speed = (state.speed + 1) % 3; else if (k === 'm' || k === 'M') { $('menu').classList.toggle('open'); renderMenu(); }
+    else if ((k === 'z' || k === 'Z') && (e.ctrlKey || e.metaKey)) doUndo();
+    else if (k === 'r' || k === 'R') { var m = state.held >= 0 ? state.mounts[state.held] : state.tool; if (m) { m[6] = m[6] ? 0 : 1; draw(); } }
+    else if (k === 'Escape') { state.tool = null; state.held = -1; state.sel = -1; $('menu').classList.remove('open'); }
+    else return;
+    e.preventDefault(); moveHeld(); draw();
+  });
+
+  function link() {
+    var m = state.mounts.map(function (x) { return x.join('.'); }).join('_');
+    return location.origin + location.pathname + '#h' + state.hull + '~' + m;
+  }
+  function fromHash() {
+    var h = location.hash.slice(1); if (h.indexOf('d') === 0 && !isNaN(+h.slice(1))) return setDesign(+h.slice(1)), true;
+    var mt = /^h(\d+)~(.*)$/.exec(h); if (!mt) return false;
+    state.hull = +mt[1]; state.mounts = mt[2] ? mt[2].split('_').map(function (s) { return s.split('.').map(Number); }) : []; $('hullSel').value = state.hull; return true;
+  }
+
+  Promise.all([fetch('designer.json', { cache: 'no-cache' }).then(function (r) { return r.json(); }), fetch('models/index.json').then(function (r) { return r.json(); }), fetch('designer_sprites/index.json').then(function (r) { return r.json(); })]).then(function (a) {
+    D = a[0]; SH = a[2]; a[1].forEach(function (m) { IDX[m.id] = m; });
+    var ds = $('design'); D.designs.forEach(function (d) { var o = document.createElement('option'); o.value = d.n; o.textContent = (d.n >= 435 ? 'Blueprint: ' : '') + d.name + (d.n < 435 ? ' (' + D.hulls[d.hull].name + ')' : ''); ds.appendChild(o); });
+    var hs = $('hullSel'); Object.keys(D.hulls).map(Number).sort(function (a, b) { return a - b; }).forEach(function (id) { var o = document.createElement('option'); o.value = id; o.textContent = D.hulls[id].name; hs.appendChild(o); });
+    ds.onchange = function () { setDesign(+ds.value); };
+    hs.onchange = function () { pushUndo(); state.hull = +hs.value; hullLayer = {}; refreshHull(); draw(); };
+    $('btnClear').onclick = function () { pushUndo(); state.mounts = []; state.sel = -1; draw(); };
+    var as = $('armorSel'); D.armorSize.forEach(function (cm, i) { var o = document.createElement('option'); o.value = i; o.textContent = cm ? 'Armor ' + cm + 'cm' : 'No armor'; as.appendChild(o); });
+    as.onchange = function () { state.armorIdx = +as.value; draw(); };
+    $('setSel').onchange = function () { state.set = $('setSel').value; loadModels(); draw(); };
+    $('btnMenu').onclick = function () { $('menu').classList.toggle('open'); renderMenu(); };
+    $('btnShare').onclick = function () { var u = link(); try { navigator.clipboard.writeText(u); } catch (e) {} location.hash = u.split('#')[1]; $('note').textContent = 'Link copied (and in the address bar).'; };
+    ['fCell', 'fCx', 'fRow', 'fFlip'].forEach(function (id) { $(id).oninput = function () { $('vCell').textContent = $('fCell').value; $('vCx').textContent = $('fCx').value; $('vRow').textContent = $('fRow').value; hullLayer = {}; refreshHull(); loadModels(); draw(); }; });
+    $('vCell').textContent = 75; $('vCx').textContent = 70; $('vRow').textContent = 25;
+    buildPalette(); window.addEventListener('resize', resize);
+    if (!fromHash()) setDesign(484);
+    resize(); loadModels(); window.designer = { state: state, fit: fit, redraw: draw, stats: stats, vp: vp, collides: collides, vbox: vbox, setMS: function (v) { MS = v; }, setDZ: function (v) { DZ = v; }, getMS: function () { return MS; }, clamp: clampToHull, hw: hullHW, data: function () { return D; } };
+  });
+})();
+</script></body></html>

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Water Generator</title>
+<style>
+:root{--bg:#0a101c;--panel:#111a2b;--line:#2a3a55;--text:#dbe6f5;--muted:#8aa0bd;--accent:#5cc8ff}
+@media (prefers-color-scheme:light){:root{--bg:#f3f6fa;--panel:#fff;--line:#c9d3e0;--text:#16202e;--muted:#5a6b82;--accent:#0a6fb5}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+main{max-width:1200px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:4px 0 6px}
+p.note{color:var(--muted);margin:0 0 12px;max-width:90ch}
+.wrap{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+#stage{flex:1 1 620px;min-width:300px;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;position:relative}
+#cv{display:block;width:100%;height:min(66vh,620px);touch-action:none;cursor:grab}
+#ctl{flex:0 0 280px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:9px}
+#ctl label{display:flex;flex-direction:column;gap:2px;color:var(--muted);font-size:12px}
+#ctl label span.v{color:var(--text);float:right}
+select,button{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+button{cursor:pointer} button:hover{border-color:var(--accent)} button[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}
+input[type=range]{accent-color:var(--accent);width:100%}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+#hud{position:absolute;left:10px;top:8px;color:#fff;font-size:12px;text-shadow:0 1px 2px #000;pointer-events:none}
+</style>
+</head>
+<body>
+<script src="nav.js"></script>
+<main>
+  <h1>Water generator</h1>
+  <p class="note">The game's sea is two small indexed tiles per group, recoloured with one of 16 alternate palettes. This builds an endless smooth sea from them: the palette lookup is done in the shader so the colours blend smoothly instead of showing blocky pixels, several scaled, rotated and drifting copies are mixed so the tiling does not show, and a few waves move the surface. How the game itself moves the tiles is not known, so the motion is a choice. Drag to look around, scroll to zoom.</p>
+  <div class="wrap">
+    <div id="stage"><canvas id="cv"></canvas><div id="hud"></div></div>
+    <div id="ctl">
+      <label>Tile group <select id="group"></select></label>
+      <label>Palette <select id="row"></select></label>
+      <label>Tile size <span class="v" id="tileV"></span><input id="tile" type="range" min="1500" max="20000" step="100" value="6000"></label>
+      <label>Wave height <span class="v" id="whV"></span><input id="wh" type="range" min="0" max="400" step="5" value="90"></label>
+      <label>Wave length <span class="v" id="wlV"></span><input id="wl" type="range" min="1500" max="20000" step="100" value="5000"></label>
+      <label>Speed <span class="v" id="spV"></span><input id="sp" type="range" min="0" max="3" step="0.05" value="1"></label>
+      <label>Highlight layer <span class="v" id="dtV"></span><input id="dt" type="range" min="0" max="1" step="0.01" value="0.35"></label>
+      <label>Bump <span class="v" id="bpV"></span><input id="bp" type="range" min="0" max="2" step="0.05" value="0.6"></label>
+      <label>Sun height <span class="v" id="suV"></span><input id="su" type="range" min="0.1" max="1.5" step="0.05" value="0.75"></label>
+      <div class="row"><button id="smooth" aria-pressed="true">Smooth</button><button id="shot">Save picture</button></div>
+    </div>
+  </div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="water.js"></script>
+<script>
+(async function () {
+  var $ = function (id) { return document.getElementById(id); }, cv = $('cv');
+  var renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, preserveDrawingBuffer: true });
+  var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(50, 1, 20, 2e6);
+  var set = await WGWater.load('water/'), water = WGWater.create(set, {}); scene.add(water.mesh);
+  var yaw = 0.6, pitch = 0.16, dist = 4500, hash = (location.hash || '').slice(1).split(',');
+  var rw = 0, rh = 0, dpr = 0;
+  function bg() { var c = water.uniforms.uFog.value; scene.background = c; }
+  function resize() { var w = cv.clientWidth, h = cv.clientHeight, d = Math.min(2, devicePixelRatio || 1); if (w !== rw || h !== rh || d !== dpr) { rw = w; rh = h; dpr = d; renderer.setPixelRatio(d); renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); } }
+  var gsel = $('group'), rsel = $('row');
+  set.groups.forEach(function (g) { var o = document.createElement('option'); o.value = g.id; o.textContent = 'Group ' + (g.id + 1) + ' (MAP ' + (3 * g.id + 1) + ' + ' + (3 * g.id + 2) + ')'; gsel.appendChild(o); });
+  var ro = document.createElement('option'); ro.value = 'own'; ro.textContent = 'The tiles\' own colours'; rsel.appendChild(ro);
+  for (var k = 0; k < 16; k++) { var o = document.createElement('option'); o.value = k; o.textContent = 'Alternate palette ' + (k + 1); rsel.appendChild(o); }
+  gsel.value = 3; rsel.value = 'own';
+  function sync() {
+    var f = function (id, txt) { $(id + 'V').textContent = txt; };
+    f('tile', $('tile').value); f('wh', $('wh').value); f('wl', $('wl').value); f('sp', (+$('sp').value).toFixed(2)); f('dt', (+$('dt').value).toFixed(2)); f('bp', (+$('bp').value).toFixed(2)); f('su', (+$('su').value).toFixed(2));
+    water.setOptions({ group: +gsel.value, row: rsel.value === 'own' ? 'own' : +rsel.value, tile: +$('tile').value, waveHeight: +$('wh').value, waveLength: +$('wl').value, speed: +$('sp').value, detail: +$('dt').value, bump: +$('bp').value, sun: { x: -0.5, y: +$('su').value, z: 0.4 } });
+    bg(); try { localStorage.setItem('wg2.water', JSON.stringify([gsel.value, rsel.value, $('tile').value, $('wh').value, $('wl').value, $('sp').value, $('dt').value, $('bp').value, $('su').value])); } catch (e) {}
+  }
+  try { var sv = JSON.parse(localStorage.getItem('wg2.water') || 'null'); if (sv) { gsel.value = sv[0]; rsel.value = sv[1]; ['tile', 'wh', 'wl', 'sp', 'dt', 'bp', 'su'].forEach(function (id, i) { $(id).value = sv[2 + i]; }); } } catch (e) {}
+  if (hash[0] !== '') { var gi = parseInt(hash[0], 10); if (gi >= 0 && gi < 5) gsel.value = gi; if (hash[1]) rsel.value = hash[1]; }
+  ['group', 'row', 'tile', 'wh', 'wl', 'sp', 'dt', 'bp', 'su'].forEach(function (id) { $(id).oninput = sync; $(id).onchange = sync; });
+  $('smooth').onclick = function () { var on = this.getAttribute('aria-pressed') !== 'true'; this.setAttribute('aria-pressed', on); water.setOptions({ smooth: on }); };
+  $('shot').onclick = function () { renderer.render(scene, cam); cv.toBlob(function (b) { var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'water.png'; a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000); }); };
+  var drag = null;
+  cv.onpointerdown = function (e) { drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; };
+  cv.onpointermove = function (e) { if (!drag) return; yaw -= (e.clientX - drag[0]) * 0.006; pitch = Math.max(0.02, Math.min(1.45, pitch + (e.clientY - drag[1]) * 0.006)); drag = [e.clientX, e.clientY]; };
+  cv.onpointerup = cv.onpointercancel = function () { drag = null; cv.style.cursor = 'grab'; };
+  cv.onwheel = function (e) { e.preventDefault(); dist = Math.max(400, Math.min(120000, dist * (e.deltaY < 0 ? 0.9 : 1.1))); };
+  sync(); var t0 = performance.now();
+  function tick() {
+    resize(); water.update((performance.now() - t0) / 1000);
+    cam.position.set(Math.sin(yaw) * Math.cos(pitch) * dist, Math.sin(pitch) * dist + 250, Math.cos(yaw) * Math.cos(pitch) * dist); cam.lookAt(0, 0, 0);
+    $('hud').textContent = 'Group ' + (+gsel.value + 1) + ' · ' + (rsel.value === 'own' ? 'own colours' : 'palette ' + (+rsel.value + 1));
+    renderer.render(scene, cam); requestAnimationFrame(tick);
+  }
+  tick();
+})();
+</script>
+</body>
+</html>

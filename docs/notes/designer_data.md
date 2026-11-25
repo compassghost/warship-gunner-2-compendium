@@ -1,0 +1,20 @@
+# Designer data from the game's own tables (2026-11-24)
+
+Code: `tools/build_designer.py` (writes `designer.json`), `tools/designer_parts.py` (part family / label / chip), `tools/game_stats.py`, `tools/designer_stats.py`, `tools/designer_vp.py`. Run order: `decode_rd_tree.py`, `full_names.py`, `model_entities.py`, `export_models.py`, then `build_designer.py`. The pages are `designer.html`, `designer3d.html` and `designer_models.html`.
+
+## Part family, label and chip (DAT 7)
+- The part table names the chip of almost every part (u16[30] group, u16[31] chip, see `tree_stats.md`): **995 of 1,120 parts**. The rest are enemy / aircraft weapons (ids 8000-9999, no chip, family "unknown") and four searchlights (kind 16).
+- **Main guns (ids 0-265) and hi-angle guns (1000-1041) are grids**, and the game links each grid point to the nearest chip that exists, which is usually another diameter. So for these the label comes from the grid: block A ids 0-146 = 21 diameters x 7 cal-lengths (45..75Cal), block B 147-181 (15.5 .. 10.0 cm), C 182-230 (25.4 .. 10.0), D 231-265 (as B), blocks B-D being mount variants. The diameters are the "diameter" chips (kind 1) of the MAIN group, largest first. Hi-angle: 12.7 cm then 10.0 cm, seven cal-lengths each, three mount variants of 14 ids. The tree chip of such a part is the exact cal-length chip if the tree has one, else the diameter's 45Cal chip.
+- Machine guns from id 1129 are mount variant D; CIWS are the machine-gun chips whose name contains "CIWS".
+- Smokestacks: id = 22000 + 1000 x nation + 100 x class + level. Bridges: forward 10000 / aft 15000 + nation x 1000 + type x 100 + level (the game's link can differ for the hidden bridges, e.g. 10304).
+- Facilities: elevator 19000 / 19001 (second = side elevator), launchers 19100-19103, heliports 29400 / 29401, catapult 29500, ammunition depot 29600, by kind.
+- Compared with the older guide-aligned table, 1,120 parts: family and label are unchanged for all but 33 of the 1,120 parts; those differences are improvements (parts the old table could not name now have their game chip: Cluster SSM Launcher, Napalm Grenade Gun, pulse weapons, the heliports and the ammunition depot) or the game's own wording (e.g. "Supersonic Oxy Trp" instead of an abbreviation).
+
+## Systems and aircraft
+- **Systems:** DAT 9 record -> chip (u16[32] / [33]) -> chip full name. Two records link no chip (Ammo-Assembler 30012, High Gravity Shield 30013); their names are DAT 14 strings 393 and 394 and their tabs ENIGMA and DEFENSE. Descriptions: DAT 15 string 1187 + (u16[31] & 255). The effect numbers are those of `tree_stats.md`.
+- **Aircraft:** DAT 6 record r -> chip via the DAT 32 pairs; name = the chip's full name. **Unplaced chips carry the game's own spreadsheet error "A#N/A" as their label** (INTERCEPT 89, BOMBER 13 / 14, HELI 9 ...): such a record has no usable name in the tables. Names the builder adds by hand: record 241 "RAH-66 Comanche" (observed in the game's list), records 0-2 "Duck aircraft N". Not recoverable from the tables: records 27, 49, 124 and 153 (and 13 loses its "J" prefix), which an earlier version named by matching their numbers against a fan guide; they show as "Aircraft N (unnamed)".
+- **Badge codes** VF / VA / VB / VQ come from the tree group (the duck aircraft from their role word); helicopters from their loadout (container = HC support, air/ship missile = HA attack, depth charges and air/sub missile = HS anti-sub). The older guide-based codes agree for 258 of 259 records (record 153 has no group).
+- The system "notes" column of the guide (for example "can be combined with ...") has no game source and is dropped.
+
+## Pages
+`designer.html` no longer carries guide text: the armor plating table of `designer_models.html` was unused and is gone (the plating weights are `designer.json` `plating` / `armorSize`, DAT 8); the one-line effect texts of `designer.html` are replaced by the first sentence of the game's description. Hand-observed facts stay (hull 700 is named "Jpn Frigate I" by the game's design screen, placement nudges, the model links in `data/weapon_models.json`).

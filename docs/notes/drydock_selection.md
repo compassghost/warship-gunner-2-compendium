@@ -1,0 +1,8 @@
+# Which drydock the game shows (found 2026-11-16, from SLUS_213.87)
+
+- Map table (DAT entry 4): the eight docks are records **67-74** (DOCK00-DOCK07). The last record (74) was skipped earlier because the parser dropped the final array; it is DOCK07 (entries 801/802). All eight share one tile list (MAP 803-810).
+- Debug strings in the executable: `DOCK TYP%d-%d MCB exist` / `MCB make` (0x2a73a0 / 0x2a73c8, used at 0x121020 / 0x121058), `now_dock_typ=%d mcb_dock_type=%d` (0x2a9558, used at 0x1d0298), `dock_dtl gwork ovr`, `dock air size ovr`.
+- The function around 0x120f80 holds a signed byte at `gp-0x7727` (0x2aedc9 if gp = 0x2b64f0): a **campaign counter**. It is set to -1 (0x1210d4, new game), incremented by one on message (5, 10) (0x120fc0-0x120fcc), copied to 0x2ae766 (0x120fe4), and capped near 0x2f (47). The "DOCK TYP%d-%d" print divides it by 6: **dock type = counter / 6, sub = counter % 6**. 48 counter values / 6 = 8 dock types = exactly DOCK00-DOCK07.
+- The dock menu code (0x1d0294) writes `now_dock_typ = (type) * 6 + sub` back into 0x2ae766.
+- So the docks are **story-progress variants**: DOCK00 for the first six counter steps, DOCK07 for the last six. DOCK02-DOCK07 are one dock gaining piers, which fits a facility that grows. DOCK00 and DOCK01 are different layouts.
+- Not verified: what message (5, 10) means (a completed mission or a returned-to-dock event?), whether the counter is missions cleared or route steps, and the exact map-record lookup (67 + type is inferred from the record order, the lookup instruction was not located). Tech tree progress is not involved in what was found.

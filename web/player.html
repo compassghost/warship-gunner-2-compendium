@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Warship Gunner 2 Compendium</title>
+<style>
+  :root{--bg:#0b1220;--panel:#141f33;--line:#3b4d6b;--text:#e8eef9;--muted:#9fb0c8;--accent:#4cc2ff}
+  @media (prefers-color-scheme:light){:root{--bg:#f6f8fc;--panel:#fff;--line:#b8c4d6;--text:#16202e;--muted:#566377;--accent:#0b72c9}}
+  *{box-sizing:border-box} html,body{height:100%;margin:0}
+  body{display:flex;flex-direction:column;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+  iframe{flex:1 1 auto;width:100%;border:0;background:var(--bg);min-height:0}
+  #player{display:flex;align-items:center;gap:10px;padding:6px 12px;background:var(--panel);border-top:1px solid var(--line);flex-wrap:wrap}
+  #player button{background:none;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font:inherit;cursor:pointer;min-width:36px}
+  #player button:hover,#player button:focus-visible{border-color:var(--accent)} #player button[aria-pressed=true]{outline:2px solid var(--accent)}
+  #player select{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:inherit;max-width:230px}
+  #seekwrap{flex:1 1 240px;display:flex;align-items:center;gap:8px;min-width:200px} #seekwrap span{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px;min-width:38px;text-align:center}
+  input[type=range]{accent-color:var(--accent);margin:0} #seek{flex:1;height:18px}
+  #status{font-size:12px;color:var(--muted);min-width:120px} #vol{width:90px}
+  label.chk{display:flex;gap:4px;align-items:center;color:var(--muted);font-size:13px;cursor:pointer}
+</style></head><body>
+<iframe id="f" title="Page" src="about:blank"></iframe>
+<div id="player" role="region" aria-label="Music player">
+  <button id="prev" title="Previous track" aria-label="Previous track">⏮</button>
+  <button id="play" title="Play / pause" aria-label="Play">▶</button>
+  <button id="next" title="Next track" aria-label="Next track">⏭</button>
+  <select id="sel" aria-label="Track"></select>
+  <div id="seekwrap"><span id="t0">0:00</span><input id="seek" type="range" min="0" max="1000" value="0" aria-label="Position"><span id="t1">0:00</span></div>
+  <label class="chk" title="Repeat the loop section from the game's own loop points, forever"><input id="loop" type="checkbox" checked> Loop</label>
+  <label class="chk" title="Volume">🔊 <input id="vol" type="range" min="0" max="100" value="80" aria-label="Volume"></label>
+  <span id="status" role="status"></span>
+  <div id="usedin" style="flex-basis:100%;font-size:12px;color:var(--muted);line-height:1.3" aria-live="polite"></div>
+</div>
+<script>
+// ---- shell: the pages live in the frame; the player lives here, so it keeps playing while the frame navigates ----
+const $ = id => document.getElementById(id), frame = $('f'), store = { get(k, d) { try { return JSON.parse(localStorage.getItem('wg2.player.' + k)) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('wg2.player.' + k, JSON.stringify(v)); } catch (e) {} } };
+function openFromHash() { const u = decodeURIComponent(location.hash.slice(2)) || 'index.html'; if (!/^[\w.\-]+\.html([?#].*)?$/.test(u)) return; frame.src = u; }   // only local pages
+addEventListener('hashchange', openFromHash); openFromHash();
+// pages report where they are (shell.js, loaded by every page): keep the address bar in step without reloading the frame
+addEventListener('message', e => { const d = e.data; if (e.origin !== location.origin || e.source !== frame.contentWindow || !d || !d.wg2nav || typeof d.url !== 'string') return; history.replaceState(null, '', '#/' + d.url); if (d.title) document.title = 'Warship Gunner 2 Compendium'; });
+
+// ---- player: Web Audio, so the game's loop points repeat without a gap ----
+const RATE = 48000; let ctx = null, gain = null, tracks = [], names = {}, cur = -1, buf = null, src = null, t0 = 0, looping = false, loopStart = 0, loopEnd = 0, token = 0;
+const cache = new Map(), el = { play: $('play'), seek: $('seek'), sel: $('sel'), t0: $('t0'), t1: $('t1'), status: $('status'), loop: $('loop'), vol: $('vol') };
+const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+const probe = document.createElement('audio'), can = { opus: !!probe.canPlayType('audio/ogg; codecs="opus"'), aac: !!probe.canPlayType('audio/mp4; codecs="mp4a.40.2"') };
+const urlOf = t => { const f = t.files; return 'music/' + ((can.opus && f.opus) || (can.aac && f.aac) || f.wav || f.opus || f.aac); };
+// stage music: stage_music.json (tools/build_stage_music.py) says which stages play each track, out of combat or in combat
+let usage = {};
+const ROLE = { out: 'out of combat', combat: 'in combat' };
+const roleText = t => { const u = usage[t.id]; if (!u) return ''; return [u.out.length && ROLE.out, u.combat.length && ROLE.combat].filter(Boolean).join(' / '); };
+const label = t => names[t.id] ? names[t.id] + ' · ' + t.n : (t.n + (roleText(t) ? ' · ' + roleText(t) : ''));
+let hints = {};       // stage_music.json "other": what the game code says about tracks that stage pairs do not explain (inferred, not heard)
+function describeUse(t) {
+  const u = usage[t.id], h = hints[t.id] ? ' · ' + hints[t.id] : '';
+  if (!u) return hints[t.id] || '';
+  const part = (arr, w) => arr.length ? w + ' in ' + arr.length + ' stage' + (arr.length > 1 ? 's' : '') + ': ' + arr.slice(0, 4).map(s => s.title).join(', ') + (arr.length > 4 ? ' and ' + (arr.length - 4) + ' more' : '') : '';
+  return [part(u.out, 'Out of combat'), part(u.combat, 'In combat')].filter(Boolean).join(' · ') + h;
+}
+function ensureCtx() { if (!ctx) { ctx = new (window.AudioContext || window.webkitAudioContext)(); gain = ctx.createGain(); gain.gain.value = el.vol.value / 100; gain.connect(ctx.destination); } return ctx; }
+async function load(i) {
+  const t = tracks[i]; if (cache.has(t.id)) return cache.get(t.id);
+  const r = await fetch(urlOf(t)); if (!r.ok) throw new Error('HTTP ' + r.status);
+  const ab = await r.arrayBuffer(), b = await new Promise((res, rej) => ensureCtx().decodeAudioData(ab, res, rej));
+  cache.set(t.id, b); while (cache.size > 3) cache.delete(cache.keys().next().value); return b;      // decoded audio is large: keep three
+}
+function position() {
+  if (!buf || !ctx) return 0; let t = ctx.currentTime - t0;
+  if (looping && t >= loopEnd) t = loopStart + ((t - loopStart) % (loopEnd - loopStart));
+  return Math.min(Math.max(t, 0), buf.duration);
+}
+function startSource(offset) {
+  if (src) { src.onended = null; try { src.stop(); } catch (e) {} src.disconnect(); }
+  const t = tracks[cur], s = ctx.createBufferSource(); s.buffer = buf; s.connect(gain);
+  loopStart = t.loop_start / RATE; loopEnd = Math.min(buf.duration, (t.loop_end + 1) / RATE);
+  s.loop = looping = el.loop.checked && loopEnd > loopStart; if (s.loop) { s.loopStart = loopStart; s.loopEnd = loopEnd; }
+  s.onended = () => { if (src === s) step(1, true); };          // a track that is not looping ends: go on to the next one
+  s.start(0, offset); t0 = ctx.currentTime - offset; src = s;
+}
+async function playTrack(i, offset = 0) {
+  const my = ++token; i = (i + tracks.length) % tracks.length; cur = i; el.sel.value = i; store.set('track', tracks[i].id);
+  el.status.textContent = 'Loading…'; el.seek.disabled = true;
+  try { ensureCtx(); const b = await load(i); if (my !== token) return; buf = b; startSource(offset); await ctx.resume(); }
+  catch (e) { if (my === token) el.status.textContent = 'Could not load: ' + e.message; return; }
+  el.status.textContent = ''; el.seek.disabled = false; el.t1.textContent = fmt(buf.duration); setMeta(); sync(); $('usedin').textContent = describeUse(tracks[i]);
+  const nxt = tracks[(i + 1) % tracks.length]; fetch(urlOf(nxt)).catch(() => {});      // warm the browser cache for the next track
+}
+function step(d, auto) { playTrack(cur < 0 ? 0 : cur + d); }
+function toggle() { if (cur < 0 || !buf) { playTrack(Math.max(0, cur)); return; } if (ctx.state === 'running') ctx.suspend(); else ctx.resume(); sync(); }
+function sync() { const run = ctx && ctx.state === 'running' && !!buf; el.play.textContent = run ? '⏸' : '▶'; el.play.setAttribute('aria-label', run ? 'Pause' : 'Play'); if ('mediaSession' in navigator) navigator.mediaSession.playbackState = run ? 'playing' : 'paused'; }
+function setMeta() { if ('mediaSession' in navigator) { navigator.mediaSession.metadata = new MediaMetadata({ title: label(tracks[cur]), artist: 'Warship Gunner 2', album: 'Soundtrack' }); } }
+function shade() {     // show the loop section on the seek bar
+  const t = tracks[cur]; if (!t) return; const a = 100 * t.loop_start / t.frames, b = 100 * (t.loop_end + 1) / t.frames, c = getComputedStyle(document.body).getPropertyValue('--line') || '#3b4d6b';
+  el.seek.style.background = 'linear-gradient(90deg,transparent ' + a + '%,rgba(76,194,255,.35) ' + a + '%,rgba(76,194,255,.35) ' + b + '%,transparent ' + b + '%)';
+}
+let dragging = false;
+(function tick() { if (buf && !dragging) { const p = position(); el.seek.value = Math.round(1000 * p / buf.duration); el.t0.textContent = fmt(p); } requestAnimationFrame(tick); })();
+el.seek.addEventListener('input', () => { dragging = true; el.t0.textContent = fmt(el.seek.value / 1000 * (buf ? buf.duration : 0)); });
+el.seek.addEventListener('change', () => { dragging = false; if (buf) { startSource(el.seek.value / 1000 * buf.duration); } });
+el.play.onclick = toggle; $('next').onclick = () => step(1); $('prev').onclick = () => (buf && position() > 4) ? playTrack(cur) : step(-1);
+el.sel.onchange = () => playTrack(+el.sel.value);
+el.vol.oninput = () => { if (gain) gain.gain.value = el.vol.value / 100; store.set('vol', +el.vol.value); };
+el.loop.onchange = () => { store.set('loop', el.loop.checked); if (src) { const lp = el.loop.checked && loopEnd > loopStart; src.loop = looping = lp; if (lp) { src.loopStart = loopStart; src.loopEnd = loopEnd; } } };
+if ('mediaSession' in navigator) { const h = (a, f) => { try { navigator.mediaSession.setActionHandler(a, f); } catch (e) {} }; h('play', toggle); h('pause', toggle); h('nexttrack', () => step(1)); h('previoustrack', () => step(-1)); }
+el.vol.value = store.get('vol', 80); el.loop.checked = store.get('loop', true); shade();
+el.sel.addEventListener('change', shade); el.play.addEventListener('click', shade);
+function indexOfTrack(id) { return tracks.findIndex(t => t.id === id); }
+// a page can ask the player to start a track: window.parent.postMessage({ wg2play: 'DBGM_B11' }, location.origin)
+addEventListener('message', e => { const d = e.data; if (e.origin !== location.origin || e.source !== frame.contentWindow || !d || typeof d.wg2play !== 'string') return; const i = indexOfTrack(d.wg2play); if (i >= 0) playTrack(i); });
+fetch('music/tracks.json').then(r => r.json()).then(async m => {
+  tracks = m.tracks; try { names = await (await fetch('music/names.json')).json(); } catch (e) {}
+  try {
+    const sm = await (await fetch('stage_music.json')).json(); hints = sm.other || {};
+    for (const s of sm.stages) { const m2 = s.music; if (!m2 || !m2.pair) continue; const st = { n: s.stage, code: s.campaign_code || s.game_code, title: s.title };
+      for (const [role, id] of [['out', m2.out_of_combat], ['combat', m2.in_combat]]) if (id) (usage[id] = usage[id] || { out: [], combat: [] })[role].push(st); }
+    const p10 = sm.pairs.find(p => p.pair === 10);       // the stealth stages: their combat track (B18) is set by a script event (inferred from the code)
+    if (p10 && usage[p10.out_of_combat]) { const stealth = usage[p10.out_of_combat].out.slice(); (usage['DBGM_B18'] = usage['DBGM_B18'] || { out: [], combat: [] }).combat.push(...stealth); }
+  } catch (e) {}
+  let g = null; for (const [i, t] of tracks.entries()) { if (!g || g.label !== t.group) { g = document.createElement('optgroup'); g.label = t.group; el.sel.appendChild(g); } const o = document.createElement('option'); o.value = i; o.textContent = label(t) + '  (' + fmt(t.seconds) + ')'; g.appendChild(o); }
+  const last = tracks.findIndex(t => t.id === store.get('track', '')); el.sel.value = cur = last >= 0 ? last : 0; el.t1.textContent = fmt(tracks[cur].seconds); shade(); $('usedin').textContent = describeUse(tracks[cur]);
+  el.sel.addEventListener('change', () => { $('usedin').textContent = describeUse(tracks[+el.sel.value]); });
+}).catch(() => { el.status.textContent = 'No music files found yet'; $('player').querySelectorAll('button,select,input').forEach(x => x.disabled = true); });
+</script>
+</body></html>

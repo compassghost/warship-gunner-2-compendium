@@ -1,0 +1,16 @@
+iso_extract/
+data/
+music/
+*.iso
+*.bin
+*.png
+*.jpg
+*.ogg
+*.wav
+__pycache__/
+*.pyc
+# the web/ pages are tracked, but generated game data is not (regenerate it with tools/)
+web/models/*
+!web/models/*.json
+web/music/*
+!web/music/*.json
