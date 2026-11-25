@@ -1309,18 +1309,28 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
     var SAVEKEY = 'wg2_designer_saves';
     function readSaves() { try { var a = JSON.parse(localStorage.getItem(SAVEKEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
     function writeSaves(a) { try { localStorage.setItem(SAVEKEY, JSON.stringify(a)); return true; } catch (e) { state.msg = 'Could not save: this browser blocks local storage.'; draw(); return false; } }
+    var saveTab = 'save';      // the Save / Load panel is tabbed: Save = the slots to save into and the share buttons, Load = the saved designs, the presets and the paste box
     function renderSave() {
-      var p = $('savep'), a = readSaves(), h = '<h3><span>SAVED DESIGNS</span><span class="x" id="saveX">&times;</span></h3>';
-      for (var i = 0; i < 6; i++) {
-        var e = a[i], when = e ? new Date(e.t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
-        h += '<div class="sv' + (e ? '' : ' empty') + '"><span class="no">' + (i + 1) + '</span><span>' + (e ? e.n + '<small>' + e.p + ' parts - ' + when + '</small>' : '- empty -') + '</span><span>' + '<button data-a="save" data-i="' + i + '">Save here</button>' + (e ? '<button data-a="load" data-i="' + i + '">Load</button><button data-a="del" data-i="' + i + '">Delete</button>' : '') + '</span></div>';
+      var p = $('savep'), a = readSaves(), h = '<h3><span>SAVE / LOAD</span><span class="x" id="saveX">&times;</span></h3>';
+      h += '<div class="tabs2"><button data-t="save" class="' + (saveTab === 'save' ? 'on' : '') + '">Save</button><button data-t="load" class="' + (saveTab === 'load' ? 'on' : '') + '">Load</button></div>';
+      var info = function (e) { return e.n + '<small>' + e.p + ' parts - ' + new Date(e.t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + '</small>'; };
+      if (saveTab === 'save') {
+        for (var i = 0; i < 6; i++) {
+          var e = a[i];
+          h += '<div class="sv' + (e ? '' : ' empty') + '"><span class="no">' + (i + 1) + '</span><span>' + (e ? info(e) : '- empty -') + '</span><span><button data-a="save" data-i="' + i + '">Save here</button>' + (e ? '<button data-a="del" data-i="' + i + '">Delete</button>' : '') + '</span></div>';
+        }
+        h += '<div class="ld"><div class="row2"><button id="cpLink">Generate Link</button><button id="cpCode">Generate Code</button></div></div>';
+      } else {
+        var any = false;
+        for (var j = 0; j < 6; j++) { var f = a[j]; if (!f) continue; any = true; h += '<div class="sv"><span class="no">' + (j + 1) + '</span><span>' + info(f) + '</span><span><button data-a="load" data-i="' + j + '">Load</button></span></div>'; }
+        if (!any) h += '<div class="sv empty"><span class="no"></span><span>- no saved designs -</span><span></span></div>';
+        var pk1 = Object.keys(PRESETS); if (pk1.length) h += '<div class="ld"><b>BUILT-IN PRESETS</b>' + pk1.map(function (k) { return '<div class="sv"><span class="no">*</span><span>' + PRESETS[k].name + ' <small style="display:inline;margin-left:6px">#' + k + '</small>' + '</span><span><button data-a="preset" data-k="' + k + '">Load</button></span></div>'; }).join('') + '</div>';
+        h += '<div class="ld"><b>LOAD A DESIGN</b><input type="text" id="ldText" placeholder="Paste a design link or code here" autocomplete="off"><div class="row2"><button id="ldGo">Load from link/code</button></div></div>';
       }
-      var pk1 = Object.keys(PRESETS); if (pk1.length) h += '<div class="ld"><b>BUILT-IN PRESETS</b>' + pk1.map(function (k) { return '<div class="sv"><span class="no">*</span><span>' + PRESETS[k].name + ' <small style="display:inline;margin-left:6px">#' + k + '</small>' + '</span><span><button data-a="preset" data-k="' + k + '">Load</button></span></div>'; }).join('') + '</div>';
-      p.innerHTML = h +
-        '<div class="ld"><b>SHARE THIS DESIGN</b><div class="row2"><button id="cpLink">Copy link</button><button id="cpCode">Copy code</button></div></div>' +
-        '<div class="ld"><b>LOAD A DESIGN</b><input type="text" id="ldText" placeholder="Paste a design link or code here" autocomplete="off"><div class="row2"><button id="ldGo">Load from link/code</button><button id="ldImg">Load from image...</button><input type="file" id="ldFile" accept="image/png,.png" hidden></div></div>';
+      p.innerHTML = h;
       $('saveX').onclick = function () { p.classList.remove('open'); };
-      p.querySelectorAll('button').forEach(function (b) {
+      p.querySelectorAll('.tabs2 button').forEach(function (b) { b.onclick = function () { saveTab = b.dataset.t; renderSave(); }; });
+      p.querySelectorAll('button[data-a]').forEach(function (b) {
         b.onclick = async function () {
           var i = +b.dataset.i, a2 = readSaves(); while (a2.length < 6) a2.push(null);
           if (b.dataset.a === 'save') {
@@ -1334,39 +1344,21 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
           } else if (b.dataset.a === 'del') { if (confirm('Delete saved design ' + (i + 1) + '?')) { a2[i] = null; writeSaves(a2); renderSave(); } }
         };
       });
-      $('cpLink').onclick = function () { copyDesign(false); }; $('cpCode').onclick = function () { copyDesign(true); };
-      $('ldGo').onclick = function () { loadFromText($('ldText').value); };
-      $('ldText').onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') loadFromText($('ldText').value); };
-      $('ldImg').onclick = function () { $('ldFile').click(); };
-      $('ldFile').onchange = function () { loadFromFile($('ldFile').files[0]); };
+      if ($('cpLink')) { $('cpLink').onclick = function () { copyDesign(false); }; $('cpCode').onclick = function () { copyDesign(true); }; }
+      if ($('ldGo')) {
+        $('ldGo').onclick = function () { loadFromText($('ldText').value); };
+        $('ldText').onkeydown = function (e) { e.stopPropagation(); if (e.key === 'Enter') loadFromText($('ldText').value); };
+      }
     }
-    // ---------- load from a link / code or from an image made by Screenshot (the image carries the design as a PNG text chunk "WG2Design") ----------
+    // ---------- load from a link or code ----------
     async function loadFromText(t) {
       t = (t || '').trim(); var i = t.indexOf('#'), h = i >= 0 ? t.slice(i + 1) : t; if (!h) { state.msg = 'Paste a design link or code first.'; draw(); return false; }
       state.msg = ''; var ok = await fromHash('#' + h);
       if (ok) { state.sel = -1; state.held = -1; state.heldPartner = -1; state.tool = null; state.msg = 'Design loaded.'; closeOvl(); } else if (!state.msg) state.msg = 'That is not a design link or code.';
       draw(); return ok;
     }
-    function pngText(buf, key) {
-      var u = new Uint8Array(buf), dv = new DataView(buf), sig = [137, 80, 78, 71, 13, 10, 26, 10]; for (var k = 0; k < 8; k++) if (u[k] !== sig[k]) return null;
-      for (var o = 8; o + 12 <= u.length;) {
-        var len = dv.getUint32(o), type = String.fromCharCode(u[o + 4], u[o + 5], u[o + 6], u[o + 7]);
-        if (type === 'tEXt') { var s = ''; for (var q = o + 8; q < o + 8 + len; q++) s += String.fromCharCode(u[q]); var z = s.indexOf('\0'); if (z > 0 && s.slice(0, z) === key) return s.slice(z + 1); }
-        if (type === 'IEND') break; o += 12 + len;
-      }
-      return null;
-    }
-    async function loadFromFile(f) {
-      if (!f) return; var buf = await f.arrayBuffer(), t = pngText(buf, 'WG2Design');
-      if (!t) { state.msg = 'This image carries no design. Screenshots made here do, unless another app re-encoded the picture (chat apps often do).'; draw(); return false; }
-      return loadFromText(t);
-    }
-    window.addEventListener('dragover', function (e) { if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') >= 0) e.preventDefault(); });
-    window.addEventListener('drop', function (e) { var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) { e.preventDefault(); loadFromFile(f); } });
-    window.addEventListener('paste', function (e) {      // Ctrl+V: a pasted design image or a pasted link
+    window.addEventListener('paste', function (e) {      // Ctrl+V: a pasted link
       if (/INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '')) return; var cd = e.clipboardData; if (!cd) return;
-      var item = Array.prototype.find.call(cd.items || [], function (it) { return it.kind === 'file' && /^image\//.test(it.type); });
-      if (item) { e.preventDefault(); loadFromFile(item.getAsFile()); return; }
       var t = cd.getData('text'); if (t && /#[zbdh][A-Za-z0-9_~.\-]+/.test(t.trim()) || (t && /^[zb][A-Za-z0-9_-]{30,}$/.test(t.trim()))) { e.preventDefault(); loadFromText(t); }
     });
     // ---------- screenshot: the blueprint, the stats and the equipment lists as one PNG ----------
