@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Warship Gunner 2 Compendium</title>
+<style>
+  :root{--bg:#0b1220;--panel:#141f33;--line:#3b4d6b;--text:#e8eef9;--muted:#9fb0c8;--accent:#4cc2ff;--node:#1b2a45}
+  @media (prefers-color-scheme:light){:root{--bg:#f6f8fc;--panel:#fff;--line:#b8c4d6;--text:#16202e;--muted:#566377;--accent:#0b72c9;--node:#eef3fb}}
+  body{margin:0;padding:16px 20px 40px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.4}
+  main{max-width:1000px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px} h2{font-size:16px;margin:26px 0 4px;padding-bottom:4px;border-bottom:1px solid var(--line)} p{margin:4px 0 10px;color:var(--muted);font-size:14px} a{color:var(--accent)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+  .card .t{font-weight:700;font-size:14px} .card .m{font-size:12px;color:var(--muted)} .card .m b{color:var(--text);font-weight:600}
+  .dchips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+  .dchip{display:block;width:150px;min-height:44px;box-sizing:border-box;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--node);color:var(--text);text-decoration:none;text-align:center}
+  .dtop{font-size:14px;font-weight:700} .dfull{font-size:11px;color:var(--muted);margin-top:1px} a.dchip:hover{border-color:var(--accent)}
+  table.kills{border-collapse:separate;border-spacing:6px;margin:4px -6px} table.kills th{font-size:12px;color:var(--muted);font-weight:700;text-align:center} table.kills td.n{font-size:13px;padding-right:8px;white-space:nowrap} table.kills td.n small{color:var(--muted)}
+  .scroll{overflow-x:auto}
+  .mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin:8px 0}
+  .mcard{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 10px 12px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+  .mcard img{display:block;width:128px;height:256px;image-rendering:auto}
+  .mcard .t{font-weight:700;font-size:14px} .mcard .m{font-size:13px;color:var(--muted)} .mcard sup{color:var(--accent)}
+  .notes{font-size:13px;color:var(--muted);padding-left:20px;list-style:none} .notes li{margin:4px 0}
+</style><script src="shell.js" defer></script></head><body><script src="nav.js"></script><main>
+<h1>Miscellaneous Rewards</h1>
+<h2>Inferno Mode</h2>
+<div class="cards" id="inferno"></div>
+<h2>Survival Mode</h2>
+<div class="cards" id="survival"></div>
+<h2>Kill awards</h2>
+<div class="scroll"><table class="kills" id="kills"></table></div>
+<h2>Medals</h2>
+<h3 style="font-size:14px;margin:16px 0 4px">Silver Swan ranks</h3>
+<div class="mgrid" id="swans"></div>
+<h3 style="font-size:14px;margin:16px 0 4px">Service and achievement medals</h3>
+<div class="mgrid" id="medals"></div>
+<ol class="notes" id="mnotes"></ol>
+<script>
+let links = {}, labels = {}, fulls = {}, sysItems = {};
+const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');   // "Ammo Assembler" = "Ammo-Assembler"
+const EMOJI = { S: '🥇', A: '🥈', T: '💰', 1: '🏆' };
+// one reward as a chip: top line the tech tree abbreviation (with a rank emoji), bottom line the full name; links to the tree, flags page or CLASSIFIED entry
+function chip(x) {
+  const m2 = x.match(/^([SAT1]):\s*(.*)$/), body = m2 ? m2[2] : x, key = body.replace(/(\s*\([^)]*\))+\s*$/, '').trim(), sysName = sysItems[norm(key)], lk = links[key] || (sysName ? { sys: sysName } : null);
+  const label = lk && lk.g && labels[lk.g + ':' + lk.i] ? labels[lk.g + ':' + lk.i] : (lk && lk.flag) || (lk && lk.cls) || (lk && lk.sys) || key;
+  const el = document.createElement(lk ? 'a' : 'span'); el.className = 'dchip'; el.title = key;
+  if (lk) el.href = lk.sys ? 'tree.html#sys:' + encodeURIComponent(lk.sys) : lk.flag ? 'flags.html#' + encodeURIComponent(lk.flag) : 'tree.html#' + (lk.cls ? 'cls:' + encodeURIComponent(lk.cls) : lk.g + ':' + lk.i);
+  const top = document.createElement('div'); top.className = 'dtop';
+  if (m2) { const e = document.createElement('span'); e.textContent = EMOJI[m2[1]]; e.style.marginRight = '4px'; top.appendChild(e); }
+  top.append(label); el.appendChild(top);
+  const full = lk && lk.g ? fulls[lk.g + ':' + lk.i] : '';
+  if (full && full !== label) { const b = document.createElement('div'); b.className = 'dfull'; b.textContent = full; el.appendChild(b); }
+  return el;
+}
+const div = (cls, text) => { const d = document.createElement('div'); d.className = cls; if (text != null) d.textContent = text; return d; };
+const meta = (k, v) => { const d = div('m'); const b = document.createElement('b'); b.textContent = k + ': '; d.append(b, v); return d; };
+Promise.all([fetch('campaign_other.json').then(r => r.json()), fetch('campaign_links.json').then(r => r.ok ? r.json() : {}).catch(() => ({})), fetch('tree.json').then(r => r.json()).catch(() => ({ categories: [] })), fetch('classified.json').then(r => r.json()).catch(() => ({ sections: [] }))]).then(([o, lk, tr, cj]) => {
+  links = lk;
+  tr.categories.forEach(c => c.groups.forEach(g => g.chips.forEach(ch => { labels[g.name + ':' + ch.i] = ch.label; fulls[g.name + ':' + ch.i] = ch.full; })));
+  cj.sections.forEach(s => s.items.forEach(it => { if (it.kind && it.kind.startsWith('Award, only one exists') && it.group) sysItems[norm(it.name)] = it.name; }));
+  cj.sections.forEach(s => s.items.forEach(it => { if (it.chip) labels[it.group + ':' + it.chip] = it.label || it.name; fulls[it.group + ':' + it.chip] = it.name; }));
+  const inf = document.getElementById('inferno');
+  o.inferno.forEach(x => {
+    const c = div('card'); c.appendChild(div('t', x.name + (x.title ? ': ' + x.title : '')));
+    if (x.location) c.appendChild(meta('Location', x.location));
+    if (x.mission) { const a = document.createElement('a'); a.href = 'campaign.html#inferno-' + x.name.replace(/\D+/g, ''); a.textContent = x.name + ' (' + x.mission + ')'; c.appendChild(meta('Mission', a)); }
+    if (x.unlock) c.appendChild(meta('Unlocked by', x.unlock.replace(/^Complete /, 'clearing ')));
+    const d = div('dchips'); d.appendChild(chip(x.reward)); c.appendChild(d); inf.appendChild(c);
+  });
+  const sv = document.getElementById('survival');
+  o.survival.forEach(x => {
+    const [xo, mis] = x.name.split(': '), c = div('card'); c.appendChild(div('t', xo)); if (mis) c.appendChild(div('m', mis));
+    const d = div('dchips'); d.appendChild(chip(x.reward)); c.appendChild(d); sv.appendChild(c);
+  });
+  const kt = document.getElementById('kills'), hr = document.createElement('tr');
+  ['', '100', '500', '999'].forEach(h => { const th = document.createElement('th'); th.textContent = h; hr.appendChild(th); }); kt.appendChild(hr);
+  o.kills.forEach(k => {
+    const tr2 = document.createElement('tr'), n = document.createElement('td'); n.className = 'n'; n.textContent = k.name + ' '; const s = document.createElement('small'); s.textContent = k.symbol; n.appendChild(s); tr2.appendChild(n);
+    k.tiers.forEach(t => { const td = document.createElement('td'); td.appendChild(chip(t.reward)); tr2.appendChild(td); }); kt.appendChild(tr2);
+  });
+});
+</script>
+<script>
+// Silver Swan ranks [name, points, R&D discount], medals [name, requirement, footnote number] and the footnotes come from medals.json (empty in this scaffold)
+let SWANS = [], MEDALS = [], NOTES = [];
+const td = (cls, text) => { const c = document.createElement('div'); if (cls) c.className = cls; if (text != null) c.textContent = text; return c; };
+// mission codes (FAR-F-093) become links to the campaign page
+function withLinks(text, cell) {
+  text.split(/([A-Z]{3}-[A-Z]-\d{3})/).forEach(p => { if (/^[A-Z]{3}-[A-Z]-\d{3}$/.test(p)) { const a = document.createElement('a'); a.href = 'campaign.html#' + p; a.textContent = p; cell.appendChild(a); } else if (p) cell.append(p); });
+}
+// medal card images from tools/extract_medals.py: Silver Swan ranks are DSN.BIN entries 55-70, service medals 73-112
+// one grid card per medal: the card image at its real 128x256 size, then the name and what it takes
+const mcard = (entry, name) => { const c = td('mcard'), im = document.createElement('img'); im.src = 'medals/' + entry + '.png'; im.alt = name; im.width = 128; im.height = 256; im.loading = 'lazy'; c.append(im, td('t', name)); return c; };
+fetch('medals.json').then(r => r.json()).catch(() => ({})).then(d => {
+  SWANS = d.swans || []; MEDALS = d.medals || []; NOTES = d.notes || [];
+const sw = document.getElementById('swans');
+  SWANS.forEach((s, i) => { const c = mcard(55 + i, s[0]); c.appendChild(td('m', (s[1] ? s[1].toLocaleString('en-US') : '0 (start)') + ' points')); if (s[2]) c.appendChild(td('m', 'R&D cost ' + s[2])); sw.appendChild(c); });
+  const md = document.getElementById('medals');
+  MEDALS.forEach((m, i) => {
+    const c = mcard(73 + i, m[0]), r = td('m'); withLinks(m[1], r);
+    if (m[2]) { const s = document.createElement('sup'); s.textContent = m[2]; r.append(' ', s); }
+    c.appendChild(r); md.appendChild(c);
+  });
+  
+  const nl = document.getElementById('mnotes'); NOTES.forEach((t, i) => { const li = document.createElement('li'), su = document.createElement('sup'); su.textContent = String(i + 1); li.append(su, ' ' + t); nl.appendChild(li); });
+});
+</script></main></body></html>

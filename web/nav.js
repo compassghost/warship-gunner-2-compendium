@@ -1,7 +1,7 @@
 /* Shared top bar for every page. Include right after <body>: <script src="nav.js"></script>
    Pages (same order as the cards on index.html): Tech Tree / Designer / Models / Missions / Story / Bosses / World Map / Rewards / Flags / Credits. The current page is highlighted (helper pages count as their parent). */
 (function () {
-  var PAGES = [['tree.html', 'Tech Tree'], ['designer.html', 'Designer'], ['models.html', 'Models'], ['drydock.html', 'Dry Dock'], ['bosses.html', 'Bosses'], ['boss_anim.html', 'Boss Animations'], ['water.html', 'Water'], ['flags.html', 'Flags']];      // same order as the cards on index.html
+  var PAGES = [['tree.html', 'Tech Tree'], ['designer.html', 'Designer'], ['models.html', 'Models'], ['campaign.html', 'Missions'], ['story.html', 'Story'], ['drydock.html', 'Dry Dock'], ['bosses.html', 'Bosses'], ['boss_anim.html', 'Boss Animations'], ['worldmap.html', 'World Map'], ['rewards.html', 'Rewards'], ['water.html', 'Water'], ['flags.html', 'Flags']];      // same order as the cards on index.html
   var PARENT = { 'designer3d.html': 'designer.html', 'designer_models.html': 'designer.html' };      // helper page -> the tab it counts as (none at the moment)
   var file = (location.pathname.split('/').pop() || 'index.html').toLowerCase();      // the site root is the index page: no tab is highlighted there
   var cur = PARENT[file] || file;

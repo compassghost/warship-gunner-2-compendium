@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Story - Warship Gunner 2 Compendium</title>
+<style>
+  :root { --bg: #0d1421; --panel: #152033; --line: #2a3a55; --text: #dbe6f5; --muted: #8aa0bd; --accent: #5cc8ff; --box: #101a2c; --boxline: #34507a; --port: 96px; --w: #f2b84b; --t: #5ad19a; --b: #ff7a7a; }      /* --w / --t / --b: the adjutant colours of the Missions page (Werner, Tsukuba, Braun) */
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #eef2f7; --panel: #fff; --line: #c9d3e0; --text: #16202e; --muted: #5a6b82; --accent: #0a6fb5; --box: #fff; --boxline: #9fb3cc; --w: #b87500; --t: #117a4d; --b: #c23030; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 18px 16px 56px; }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  .lead { color: var(--muted); margin: 0 0 14px; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .routesel { display: none; font: inherit; font-size: 13px; padding: 3px 8px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+  /* the bar across both columns: mission title on the left, Previous / Next and the route buttons on the right; it stays under the site bar while the conversation scrolls */
+  .bar { position: sticky; top: var(--sn-h, 44px); z-index: 20; background: var(--bg); margin: 0 -16px 14px; padding: 8px 16px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+  .bar .info { flex: 1 1 260px; min-width: 0; }
+  .bar .head { margin: 0; }
+  .bar .head h2 { font-size: 20px; }
+  .xlink { font-size: 13px; color: var(--accent); text-decoration: none; white-space: nowrap; }
+  .xlink:hover { text-decoration: underline; }
+  .bar .meta { margin: 0; }
+  .ctrls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
+  .ctrls .tabs { margin-left: 10px; }
+  .tabs button, .nav button, .ctrls > button { font: inherit; font-size: 14px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 14px; cursor: pointer; }
+  .tabs button:hover:not(:disabled), .nav button:hover:not(:disabled), .ctrls > button:hover:not(:disabled) { border-color: var(--accent); }
+  .tabs button[aria-selected=true] { color: var(--accent); border-color: var(--accent); }
+  .tabs .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; }
+  .nav button:disabled, .ctrls button:disabled { opacity: .4; cursor: default; }
+  .blurb { color: var(--muted); font-size: 14px; margin: 0 0 14px; }
+  .layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 18px; align-items: start; }
+  #list { position: sticky; top: calc(var(--sn-h, 44px) + var(--bar-h, 64px) + 12px); max-height: calc(100vh - var(--sn-h, 44px) - var(--bar-h, 64px) - 28px); overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px; }
+  #list button { display: flex; gap: 8px; width: 100%; text-align: left; font: inherit; font-size: 13px; line-height: 1.3; color: var(--text); background: none; border: 0; border-radius: 5px; padding: 5px 8px; cursor: pointer; }
+  #list button:hover { background: rgba(92,200,255,.10); }
+  #list button[aria-current=true] { background: rgba(92,200,255,.18); color: var(--accent); }
+  #list .n { flex: none; width: 2.6em; color: var(--muted); font-variant-numeric: tabular-nums; }
+  #list .grp { padding: 8px 8px 2px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  #pick { display: none; flex: 1 0 100%; font: inherit; padding: 8px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+  .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin: 0 0 4px; }
+  .head h2 { margin: 0; font-size: 22px; }
+  .head .num { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .meta { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+  .nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 6px; }
+  .chip { display: inline-block; font-size: 11px; padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); white-space: nowrap; }
+  .block { margin: 22px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 10px; }
+  .block::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+  .panel { display: flex; gap: 14px; margin: 12px 0; align-items: flex-start; }
+  .panel.right { flex-direction: row-reverse; }
+  .port { flex: none; width: var(--port); text-align: center; }
+  .port .pic { width: var(--port); height: var(--port); border-radius: 10px; background: var(--panel); border: 1px solid var(--line); display: grid; place-items: center; color: var(--muted); overflow: hidden; }
+  .port img { width: 100%; height: 100%; display: block; image-rendering: auto; }
+  .port .nm { margin-top: 4px; font-size: 12px; font-weight: 600; line-height: 1.2; }
+  .box { position: relative; flex: 1; min-width: 0; background: var(--box); border: 1px solid var(--boxline); border-radius: 10px; padding: 10px 14px 6px; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+  .box::before { content: ""; position: absolute; top: 28px; left: -7px; width: 12px; height: 12px; background: var(--box); border-left: 1px solid var(--boxline); border-bottom: 1px solid var(--boxline); transform: rotate(45deg); }
+  .panel.right .box::before { left: auto; right: -7px; transform: rotate(-135deg); }
+  .box p { margin: 0 0 .65em; }
+  /* lines only some adjutants see: the box takes the adjutant's colour (two adjutants: a gradient from one to the other) */
+  .box.adj { border: 2px solid transparent; padding: 9px 13px 5px; background: linear-gradient(color-mix(in srgb, var(--c1) 10%, var(--box)), color-mix(in srgb, var(--c2) 10%, var(--box))) padding-box, linear-gradient(90deg, var(--c1), var(--c2)) border-box; }
+  .box.adj::before { top: 27px; left: -8px; background: color-mix(in srgb, var(--c1) 10%, var(--box)); border-left: 2px solid var(--c1); border-bottom: 2px solid var(--c1); }
+  .panel.right .box.adj::before { left: auto; right: -8px; background: color-mix(in srgb, var(--c2) 10%, var(--box)); border-left: 2px solid var(--c2); border-bottom: 2px solid var(--c2); }
+  .legend { color: var(--muted); font-size: 13px; margin: 0 0 14px; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; }
+  .legend i { display: inline-block; width: 22px; height: 12px; border-radius: 4px; margin-right: 5px; vertical-align: -1px; border: 2px solid; }
+  .panel.voice .box { border-style: dashed; }
+  /* All routes: a run of dialogue that depends on the adjutant is ONE branch (the game plays only one version); the slider picks which version is shown */
+  .branch { margin: 18px 0; border: 1px solid var(--line); border-left: 4px solid var(--bc, var(--accent)); border-radius: 10px; padding: 8px 14px 2px; background: color-mix(in srgb, var(--bc, var(--accent)) 4%, transparent); transition: border-color .22s; }
+  .bhead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+  .bhead .bl { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .seg { position: relative; display: inline-grid; grid-template-columns: repeat(var(--n, 3), 1fr); margin-left: auto; padding: 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; }
+  .seg .thumb { position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc((100% - 4px) / var(--n, 3)); box-sizing: border-box; border-radius: 999px; border: 1.5px solid var(--bc); background: color-mix(in srgb, var(--bc) 22%, var(--panel)); transform: translateX(calc(var(--i, 0) * 100%)); transition: transform .22s ease, border-color .22s, background .22s; }
+  .seg button { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 6px; font: inherit; font-size: 13px; color: var(--text); background: none; border: 0; border-radius: 999px; padding: 4px 14px; cursor: pointer; }
+  .seg .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+  .bbody .panel:first-child { margin-top: 8px; }
+  .bempty { color: var(--muted); font-style: italic; padding: 14px 4px 18px; }
+  .msg { margin: 12px auto; max-width: 640px; text-align: center; background: var(--box); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 14px; font-weight: 600; }
+  .note { color: var(--muted); font-size: 13px; border-left: 3px solid var(--accent); padding: 4px 12px; margin: 16px 0 0; background: rgba(92,200,255,.07); border-radius: 0 6px 6px 0; }
+  @media (max-width: 800px) {
+    :root { --port: 72px; }
+    .layout { grid-template-columns: 1fr; }
+    #list { display: none; }
+    #pick { display: block; padding: 5px 8px; }
+    .bar { padding: 6px 12px; margin-left: -12px; margin-right: -12px; gap: 4px 10px; }      /* a compact bar: it stays on screen while reading */
+    .bar .meta { display: none; }
+    .bar .head h2 { font-size: 17px; }
+    .ctrls { margin-left: 0; gap: 6px; flex: 1 1 100%; flex-wrap: nowrap; }
+    .ctrls .tabs { display: none; }      /* phone: the route is a dropdown next to Previous / Next */
+    .routesel { display: block; flex: 1 1 110px; min-width: 0; }
+    .tabs button, .ctrls > button { font-size: 13px; padding: 3px 10px; }
+    .panel { gap: 10px; }
+    .box { padding: 8px 12px 4px; }
+  }
+</style>
+<script src="shell.js" defer></script></head>
+<body><script src="nav.js"></script>
+<main>
+  <h1>Story</h1>
+  <div class="bar" id="bar">
+    <div class="info" id="info"></div>
+    <div class="ctrls" id="ctrls"></div>
+    <select id="pick" aria-label="Mission"></select>
+  </div>
+  <div class="layout">
+    <nav id="list" aria-label="Missions"></nav>
+    <section id="reader">
+      <div id="out">Loading&hellip;</div>
+    </section>
+  </div>
+</main>
+<script>
+(function () {
+  'use strict';
+  var D = null, T = null, mission = null, $ = function (id) { return document.getElementById(id); };
+  var TERMINAL = /[.!?…"”♪~]$/;
+  var COLORS = ['#7fd1ff', '#8fe3a0', '#ffd479', '#ff9fc0', '#c3a6ff', '#ffa86b', '#e86f6f', '#8fb0d8', '#d2c08a', '#a0a8b8', '#a0a8b8', '#a0a8b8', '#8a95a8'];
+  var tabsEl = document.createElement('div'); tabsEl.className = 'tabs'; tabsEl.setAttribute('role', 'tablist');      // the route buttons: in the bar, next to Previous / Next
+  var pvB = document.createElement('button'), nxB = document.createElement('button'); pvB.textContent = '← Previous'; nxB.textContent = 'Next →';
+  var routeSel = document.createElement('select'); routeSel.className = 'routesel'; routeSel.setAttribute('aria-label', 'Route');      // on a narrow screen the route buttons become this dropdown
+  var BITS = [['Tsukuba', 1], ['Braun', 2], ['Werner', 4]], XOBIT = { Tsukuba: 1, Braun: 2, Werner: 4 };
+  /* ONE campaign; the route chooses what is shown: every route's lines, or only one adjutant's (the missions that adjutant plays, with the lines his route sees) */
+  var ROUTES = [
+    { id: 'all', title: 'All routes', xo: null, bit: 7, dot: null, blurb: 'The whole campaign. Lines that only some adjutants see are coloured; the rest is the same for everyone who plays the mission.' },
+    { id: 'werner', title: 'Werner', xo: 'Werner', bit: 4, dot: '--w', blurb: 'Werner as adjutant: the missions he plays, with only the lines of his route.' },
+    { id: 'tsukuba', title: 'Tsukuba', xo: 'Tsukuba', bit: 1, dot: '--t', blurb: 'Tsukuba as adjutant: the missions he plays, with only the lines of his route.' },
+    { id: 'braun', title: 'Braun', xo: 'Braun', bit: 2, dot: '--b', blurb: 'Braun as adjutant: the missions she plays, with only the lines of her route.' }];
+
+  /* the same logic as tools/story_transcript.py (resolve / panels / paras) */
+  function resolve(lines, bit, bt) {      // lines of one block that this transcript shows; an untagged line takes the speaker of the latest visible line before it that shares a route with it
+    var vis = lines.filter(function (l) { return l[3] & bit; }).map(function (l) { return l.slice(); });
+    vis.forEach(function (l, i) {
+      if (l[0] !== -1 || bt === 5) return;
+      for (var j = i - 1; j >= 0; j--) if (vis[j][0] !== -1 && (vis[j][3] & l[3])) { l[0] = vis[j][0]; break; }
+    });
+    return vis;
+  }
+  function panels(lines, bit, bt, mm) {      // consecutive lines of one speaker = ONE panel (one portrait, all the text); mm = the adjutants (bits) who play the mission.
+    /* a line's mask counted only over those adjutants: when every adjutant of the mission sees it, it is the same for everyone (dep = false, a plain box); otherwise it depends on the adjutant (coloured), and a panel ends where that changes */
+    var ps = [];
+    resolve(lines, bit, bt).forEach(function (l) {
+      var p = ps[ps.length - 1], spk = l[0], em = l[3] & mm;
+      if (p && spk !== -1 && p.spk === spk && p.mask === em) p.text.push(l[2]);
+      else if (p && spk === -1 && p.spk === -1 && p.mask === em && !TERMINAL.test(p.text[p.text.length - 1])) p.text.push(l[2]);
+      else ps.push({ spk: spk, ex: l[1], mask: em, dep: em !== mm && em !== 0, text: [l[2]] });
+    });
+    return ps;
+  }
+  function paras(texts) {      // a page that stops in mid-sentence runs on into the next one
+    var out = [];
+    texts.forEach(function (t) { if (out.length && !TERMINAL.test(out[out.length - 1])) out[out.length - 1] += ' ' + t; else out.push(t); });
+    return out;
+  }
+  function missionsOf(t) { return D.missions.filter(function (m) { return !t.xo || m.xos.indexOf(t.xo) >= 0; }); }
+  function missionMask(m) { return m.xos.reduce(function (a, n) { return a | XOBIT[n]; }, 0); }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function pad(n) { return ('000' + n).slice(-3); }
+  function routeLabel(mask) { var r = BITS.filter(function (b) { return mask & b[1]; }).map(function (b) { return b[0]; }); return r.join(' / ') + (r.length > 1 ? ' routes' : ' route'); }
+
+  var SILHOUETTE = '<svg viewBox="0 0 48 48" width="52%" height="52%" fill="currentColor" aria-hidden="true"><circle cx="24" cy="16" r="9"/><path d="M6 46c0-11 8-18 18-18s18 7 18 18z"/></svg>';
+  var VOICE = '<svg viewBox="0 0 48 48" width="52%" height="52%" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M8 14h32a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H22l-8 7v-7H8a2 2 0 0 1-2-2V16a2 2 0 0 1 2-2z"/><path d="M15 21h18M15 27h12"/></svg>';
+
+  var LANES = [['werner', 'Werner', 4, '--w'], ['tsukuba', 'Tsukuba', 1, '--t'], ['braun', 'Braun', 2, '--b']], pref = 'werner', branches = [];      // lane order of the Missions page; pref = the route last chosen on a slider (the other sliders follow it)
+  function branchEl(run, bt, mm) {      // run = consecutive adjutant-dependent panels of one block: the version of each route is the panels whose mask has its bit; every adjutant who plays the mission gets a segment, an empty one when his route has nothing here
+    var w = el('div', 'branch'), head = el('div', 'bhead'), body = el('div', 'bbody'); w.appendChild(head); w.appendChild(body);
+    var opts = LANES.filter(function (l) { return mm & l[2]; });
+    if (opts.length < 2) { run.forEach(function (p) { body.appendChild(panelEl(p, bt)); }); return w; }      // (cannot happen: with one adjutant nothing depends on the route)
+    head.appendChild(el('span', 'bl', 'Dialogue Branch'));
+    var seg = el('div', 'seg'), btns = []; seg.style.setProperty('--n', opts.length); seg.appendChild(el('i', 'thumb'));
+    opts.forEach(function (l) {
+      var b = el('button'), dt = el('span', 'dot'); b.type = 'button'; dt.style.background = 'var(' + l[3] + ')'; b.appendChild(dt); b.appendChild(document.createTextNode(l[1]));
+      b.onclick = function () { pref = l[0]; branches.forEach(function (x) { x.pick(l[0]); }); }; seg.appendChild(b); btns.push(b);
+    });
+    head.appendChild(seg);
+    var cur = null;
+    function pick(id) {
+      var k = opts.findIndex(function (l) { return l[0] === id; }); if (k < 0 || id === cur) return; cur = id;
+      seg.style.setProperty('--i', k); w.style.setProperty('--bc', 'var(' + opts[k][3] + ')'); seg.style.setProperty('--bc', 'var(' + opts[k][3] + ')');
+      btns.forEach(function (b, j) { b.setAttribute('aria-pressed', String(j === k)); });
+      body.textContent = ''; var vs = run.filter(function (p) { return p.mask & opts[k][2]; });
+      if (!vs.length) body.appendChild(el('div', 'bempty', 'Nothing here on the ' + opts[k][1] + ' route.'));
+      vs.forEach(function (p) { body.appendChild(panelEl(p, bt)); });
+    }
+    branches.push({ pick: pick }); pick(opts.some(function (l) { return l[0] === pref; }) ? pref : opts[0][0]); return w;
+  }
+  function panelEl(p, bt) {
+    if (bt === 5) { return el('div', 'msg', paras(p.text).join(' ')); }      // a text message shown on screen: no speaker
+    var named = p.spk >= 0, right = p.spk === 0;      // the player's captain (Schulz) answers from the right
+    var d = el('div', 'panel' + (right ? ' right' : '') + (named ? '' : ' voice'));
+    var port = el('div', 'port'), pic = el('div', 'pic');
+    if (named && p.spk < D.portBase.length) {
+      var id = D.portBase[p.spk] + (p.ex < D.portCount[p.spk] ? p.ex : 0), img = new Image();
+      img.src = 'portraits/p' + id + '.png'; img.alt = D.names[p.spk]; img.loading = 'lazy'; img.width = 128; img.height = 128; pic.appendChild(img);
+    } else pic.innerHTML = named ? SILHOUETTE : VOICE;
+    port.appendChild(pic);
+    var nm = el('div', 'nm', named ? D.names[p.spk] : 'Voice'); nm.style.color = COLORS[named ? p.spk : 11]; port.appendChild(nm);
+    var box = el('div', 'box');
+    if (p.dep) {      // adjutant-dependent: coloured like the Missions page (lane order Werner, Tsukuba, Braun); the same for everyone who plays the mission = the plain blue box
+      var cs = [['Werner', 4, '--w'], ['Tsukuba', 1, '--t'], ['Braun', 2, '--b']].filter(function (c) { return p.mask & c[1]; });
+      box.className = 'box adj'; box.style.setProperty('--c1', 'var(' + cs[0][2] + ')'); box.style.setProperty('--c2', 'var(' + cs[cs.length - 1][2] + ')');    }
+    paras(p.text).forEach(function (t) { box.appendChild(el('p', null, t)); });
+    d.appendChild(port); d.appendChild(box); return d;
+  }
+
+  function show(m) {
+    mission = m; var out = $('out'), mm = missionMask(m), ms = missionsOf(T), i = ms.indexOf(m); out.textContent = ''; branches = [];
+    var info = $('info'), h = el('div', 'head'); info.textContent = ''; h.appendChild(el('span', 'num', pad(m.num))); h.appendChild(el('h2', null, m.title));
+    var xl = el('a', 'xlink', 'Mission details →'); xl.href = 'campaign.html#' + pad(m.num); h.appendChild(xl); info.appendChild(h);      // (the Missions page opens that mission from its number)
+    info.appendChild(el('p', 'meta', [m.place, m.code.replace(/_/g, '-'), m.xos.length === 3 ? '' : m.xos.join(' + ') + ' only'].filter(Boolean).join(' · ')));      // (no note for a mission everyone plays)
+    Array.prototype.forEach.call(tabsEl.children, function (b) {      // the adjutants who do not play this mission are greyed out
+      var r = ROUTES.filter(function (t) { return t.id === b.dataset.id; })[0], branching = m.num >= 60 && m.num <= 690;      // the route only matters in the campaign proper: the tutorial (010-050) and the special missions (700-760) are the same for everyone
+      var ok = !r.xo || (branching && m.xos.indexOf(r.xo) >= 0);
+      b.disabled = !ok;
+    });
+    Array.prototype.forEach.call(routeSel.options, function (o) {      // (the same for the dropdown)
+      var r = ROUTES.filter(function (t) { return t.id === o.value; })[0]; o.disabled = !!r.xo && !(m.num >= 60 && m.num <= 690 && m.xos.indexOf(r.xo) >= 0);
+    });
+    [pvB, nxB].forEach(function (b, k) { b.disabled = k ? i >= ms.length - 1 : i <= 0; b.onclick = function () { go(ms[i + (k ? 1 : -1)]); }; });      // (the Previous / Next buttons of the bar)
+    var nav2 = el('div', 'nav'), pv = el('button', null, '← Previous'), nx = el('button', null, 'Next →');      // (and a second pair under the conversation)
+    pv.disabled = pvB.disabled; nx.disabled = nxB.disabled; pv.onclick = pvB.onclick; nx.onclick = nxB.onclick; nav2.appendChild(pv); nav2.appendChild(nx);
+    var n = 0;
+    m.blocks.forEach(function (b) {
+      var ps = panels(b.lines, T.bit, b.t, mm); if (!ps.length) return;
+      if (b.t !== 5) out.appendChild(el('div', 'block', D.blockNames[b.t] || 'Block'));
+      var run = [];      // (All routes only) consecutive adjutant-dependent panels = one branch with a slider
+      var flush = function () { if (run.length) { out.appendChild(branchEl(run, b.t, mm)); run = []; } };
+      ps.forEach(function (p) { n++; if (T.bit === 7 && p.dep) run.push(p); else { flush(); out.appendChild(panelEl(p, b.t)); } });
+      flush();
+    });
+    if (!n) out.appendChild(el('p', 'meta', 'No story text in this mission for this transcript.'));
+    out.appendChild(nav2);
+    Array.prototype.forEach.call($('list').querySelectorAll('button'), function (b) { b.setAttribute('aria-current', String(b.dataset.num === String(m.num))); });
+    $('pick').value = String(m.num); document.title = pad(m.num) + ' ' + m.title + ' - Story - Warship Gunner 2 Compendium';
+    var cur = $('list').querySelector('[aria-current=true]'); if (cur) cur.scrollIntoView({ block: 'nearest' });
+  }
+  function go(m) { history.replaceState(null, '', '#' + T.id + '/' + pad(m.num)); show(m); window.scrollTo(0, 0); }
+
+  function setTranscript(id, num) {
+    if (id === 'full') id = 'all';      // (older links: #full/060)
+    T = ROUTES.filter(function (t) { return t.id === id; })[0] || ROUTES[0];
+    Array.prototype.forEach.call(tabsEl.children, function (b) { b.setAttribute('aria-selected', String(b.dataset.id === T.id)); }); routeSel.value = T.id;
+    var ms = missionsOf(T), list = $('list'), pick = $('pick'); list.textContent = ''; pick.textContent = '';
+    var region = null;
+    ms.forEach(function (m) {
+      var r = m.code.slice(0, 3);
+      if (r !== region) { region = r; list.appendChild(el('div', 'grp', { FAR: 'Far East', PAC: 'Pacific', EUR: 'Europe', MED: 'Mediterranean', ARC: 'Arctic', SPE: 'Special' }[r] || r)); }
+      var b = el('button'); b.dataset.num = m.num; b.appendChild(el('span', 'n', pad(m.num))); b.appendChild(el('span', null, m.title)); b.onclick = function () { go(m); }; list.appendChild(b);
+      var o = el('option', null, pad(m.num) + '  ' + m.title); o.value = m.num; pick.appendChild(o);
+    });
+    var start = ms.filter(function (m) { return m.num === num; })[0] || ms[0];
+    show(start);
+  }
+  function fromHash() {
+    var p = location.hash.replace(/^#/, '').split('/'); setTranscript(p[0] || 'full', parseInt(p[1], 10));
+  }
+
+  fetch('story_transcripts.json').then(function (r) { return r.json(); }).then(function (d) {
+    D = d;
+    var ctrls = $('ctrls'); ctrls.appendChild(pvB); ctrls.appendChild(nxB); ctrls.appendChild(tabsEl); ctrls.appendChild(routeSel);
+    function chooseRoute(id) { var num = mission ? mission.num : 0; setTranscript(id, num); history.replaceState(null, '', '#' + T.id + '/' + pad(mission.num)); }
+    ROUTES.forEach(function (t) { var o = el('option', null, t.title); o.value = t.id; routeSel.appendChild(o); });
+    routeSel.onchange = function () { chooseRoute(routeSel.value); };
+    if (window.ResizeObserver) new ResizeObserver(function () { document.documentElement.style.setProperty('--bar-h', $('bar').offsetHeight + 'px'); }).observe($('bar'));      // the mission list sticks just under the bar, whatever height it has
+    ROUTES.forEach(function (t) {
+      var b = el('button'); b.dataset.id = t.id; b.setAttribute('role', 'tab');
+      if (t.dot) { var dt = el('span', 'dot'); dt.style.background = 'var(' + t.dot + ')'; b.appendChild(dt); }
+      b.appendChild(document.createTextNode(t.title));
+      b.onclick = function () { chooseRoute(t.id); };
+      tabsEl.appendChild(b);
+    });
+    $('pick').onchange = function () { var m = D.missions.filter(function (x) { return x.num === +$('pick').value; })[0]; if (m) go(m); };
+    window.addEventListener('hashchange', fromHash);
+    document.addEventListener('keydown', function (e) {
+      if (e.target.tagName === 'SELECT' || e.altKey || e.ctrlKey || e.metaKey) return;
+      var ms = missionsOf(T), i = ms.indexOf(mission);
+      if (e.key === 'ArrowLeft' && i > 0) go(ms[i - 1]); else if (e.key === 'ArrowRight' && i < ms.length - 1) go(ms[i + 1]);
+    });
+    fromHash();
+  }).catch(function (e) { $('out').textContent = 'Could not load the story data: ' + e.message; });
+})();
+</script>
+</body>
+</html>

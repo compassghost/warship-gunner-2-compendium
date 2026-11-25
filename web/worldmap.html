@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Warship Gunner 2 Compendium</title>
+<style>
+  :root{--bg:#0b1220;--panel:#141f33;--line:#3b4d6b;--text:#e8eef9;--muted:#9fb0c8;--accent:#4cc2ff;--w:#f2b84b;--t:#5ad19a;--b:#ff7a7a;--sp:#b58cff;--inf:#ff8a3d;--tr:#9fb0c8;--sea:#0f1a2e;--land:#26364f;--coast:#5d7699;--grid:#8aa0bd}
+  @media (prefers-color-scheme:light){:root{--bg:#f6f8fc;--panel:#fff;--line:#b8c4d6;--text:#16202e;--muted:#566377;--accent:#0b72c9;--w:#b87500;--t:#117a4d;--b:#c23030;--sp:#7a45d6;--inf:#c25a10;--tr:#6c7b92;--sea:#dbe7f5;--land:#f4f1e8;--coast:#7d8ea8;--grid:#566377}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.4;overflow:hidden}
+  a{color:var(--accent)}
+  .app{display:flex;height:calc(100vh - var(--sn-h,0px))}
+  #stage{flex:1 1 auto;position:relative;min-width:0;background:var(--sea)}
+  #map{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab;user-select:none}
+  #map.drag{cursor:grabbing}
+  aside{flex:0 0 340px;overflow:auto;background:var(--panel);border-left:1px solid var(--line);padding:12px 14px}
+  h1{font-size:18px;margin:0 0 2px} h2{font-size:12px;margin:14px 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 6px}
+  label.opt{display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:14px;cursor:pointer}
+  label.opt input{margin-top:3px}
+  .camp{display:flex;gap:8px;align-items:center;padding:5px 6px;margin:0 -6px;border-radius:6px;cursor:pointer;font-size:14px}
+  .camp:hover{background:rgba(127,160,200,.12)}
+  .camp .sw{flex:0 0 12px;height:12px;border-radius:50%} .camp .n{margin-left:auto;color:var(--muted);font-size:12px}
+  .camp small{color:var(--muted)}
+  .btns{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+  button.b{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font:inherit;font-size:13px;cursor:pointer}
+  button.b:hover{border-color:var(--accent)}
+  #zoom{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:4px}
+  #zoom button{width:32px;height:32px;font-size:18px;line-height:1;padding:0;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;cursor:pointer}
+  #zoom button:hover{border-color:var(--accent)}
+  #tip{position:absolute;pointer-events:none;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12px;max-width:260px;display:none;z-index:5;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  #tip b{display:block;font-size:13px}
+  .mrow{border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin:5px 0;font-size:13px;cursor:pointer;background:var(--bg)}
+  .mrow:hover,.mrow.on{border-color:var(--accent)}
+  .mrow.dim{opacity:.55}
+  .mrow .t{display:flex;gap:6px;align-items:baseline}
+  .mrow .num{font-weight:700;min-width:30px;color:var(--accent)} .mrow .loc{color:var(--muted);font-size:12px}
+  .mrow .dots{margin-left:auto;display:flex;gap:3px;flex:none}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .boss{color:var(--b);font-weight:700}
+  .obj{margin:4px 0 0;padding-left:18px;color:var(--muted);font-size:12px}
+  .guess{color:var(--inf);font-size:12px}
+  #detail h3{font-size:16px;margin:0 0 2px} #detail .ll{color:var(--muted);font-size:12px;margin-bottom:6px}
+  #list{max-height:none}
+  svg:not(.near) .num2, svg.nonum .num2{display:none} #ll:empty{display:none}
+  svg text{font-family:inherit;pointer-events:none}
+  .mk{cursor:pointer}
+  .src{color:var(--muted);font-size:12px;margin-top:14px}
+  .camp .cn{background:none;border:0;color:inherit;font:inherit;padding:0;cursor:pointer;text-align:left;border-bottom:1px dotted var(--muted)}
+  .camp .cn:hover{color:var(--accent);border-color:var(--accent)}
+  h2.set{margin:10px 0 2px;font-size:11px}
+  #nav{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:none;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 8px;box-shadow:0 2px 10px rgba(0,0,0,.35);max-width:calc(100% - 20px);z-index:4}
+  #nav button{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;min-width:36px;height:34px;font-size:16px;cursor:pointer}
+  #nav button:hover:not(:disabled){border-color:var(--accent)} #nav button:disabled{opacity:.35;cursor:default}
+  #nTxt{min-width:200px;max-width:420px;text-align:center;font-size:13px;line-height:1.3} #nTxt b{display:block;font-size:14px} #nTxt span{color:var(--muted)}
+  #ll{position:absolute;left:10px;bottom:10px;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font:12px ui-monospace,Consolas,monospace;opacity:.92;pointer-events:none;z-index:3}
+  #stage.nav-on #ll{bottom:64px}
+  @media (max-width:820px){body{overflow:auto}.app{flex-direction:column;height:auto}#stage{height:60vh;flex:none}aside{flex:none;border-left:0;border-top:1px solid var(--line)}}
+</style><script src="shell.js" defer></script></head><body><script src="nav.js"></script>
+<div class="app">
+  <div id="stage">
+    <svg id="map" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="World map with Warship Gunner 2 mission locations">
+      <defs><g id="land"></g></defs>
+      <rect id="sea" x="-6000" y="-3000" width="12000" height="6000" style="fill:var(--sea)"/>
+      <g id="landG"></g><g id="gridG"></g><g id="routeG"></g><g id="markG"></g>
+    </svg>
+    <div id="zoom"><button id="zin">+</button><button id="zout">−</button><button id="zfit" style="font-size:13px">⤢</button></div>
+    <div id="ll"></div>
+    <div id="nav"><button id="nPrev">◀</button><div id="nTxt"></div><button id="nNext">▶</button><button id="nExit">✕</button></div>
+  </div>
+  <aside>
+    <h1>World Map</h1>
+    <p class="sub">Where each campaign takes you. Tick several campaigns to stack them: shared stops get a ring split into each campaign's colour.</p>
+    <div id="camps"></div>
+    <h2>Display</h2>
+    <label class="opt"><input id="oRoute" type="checkbox" checked> Show routes between missions</label>
+    <label class="opt"><input id="oNum" type="checkbox" checked> Show mission numbers</label>
+    <label class="opt"><input id="oProg" type="checkbox"> Progressive View</label>
+    <label class="opt"><input id="oGrid" type="checkbox" checked> Latitude / longitude grid</label>
+    <div id="detailBox"><h2>Selected place</h2><div id="detail" class="sub">Click a marker or a mission below.</div></div>
+    <h2 id="listHead">Missions</h2>
+    <div id="list"></div>
+    <div class="src">Map: <a href="https://simplemaps.com/resources/svg-world" target="_blank" rel="noopener">simplemaps.com</a> (non-commercial use)</div>
+  </aside>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---- projection: the SVG is a plain latitude/longitude map (fitted against ~20 coastline landmarks)
+  const KX = 5.514, KY = 6.42, X0 = 981.8, Y0 = 501.4, WW = 360 * KX, MAPH = 955, MAPY = -30;      // fitted to maps/world_simplemaps.svg (a plain lat/lon map, stretched a little taller than wide); MAPY..MAPY+MAPH is the area shown (room above the Arctic and below the Antarctic Ocean)
+  const px = lon => X0 + KX * lon, py = lat => Y0 - KY * lat;
+  const NS = 'http://www.w3.org/2000/svg';
+  const $ = id => document.getElementById(id);
+  const s = (tag, a, st) => { const e = document.createElementNS(NS, tag); if (a) for (const k in a) e.setAttribute(k, a[k]); if (st) for (const k in st) e.style.setProperty(k, st[k]); return e; };
+  const h = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+
+  const CAMPS = [
+    { id: 'training',set: 'Campaign', name: 'Training', color: 'var(--tr)' },
+    { id: 'werner',  set: 'Campaign', name: 'Werner',   color: 'var(--w)' },
+    { id: 'tsukuba', set: 'Campaign', name: 'Tsukuba',  color: 'var(--t)' },
+    { id: 'braun',   set: 'Campaign', name: 'Braun',    color: 'var(--b)' },
+    { id: 'special', set: 'Extra', name: 'Special missions', color: 'var(--sp)' },
+    { id: 'inferno', set: 'Extra', name: 'Inferno',  color: 'var(--inf)', route: false }
+  ];
+  const CAMP = Object.fromEntries(CAMPS.map(c => [c.id, c]));
+  const CAPT = ['werner', 'tsukuba', 'braun'];
+  let on = new Set(CAPT), missions = [], locs = {}, byLoc = new Map(), selLoc = null, hoverM = null, cur = null, navOpen = false;      // cur = the mission the ◀ ▶ stepper is on (null = not started)
+  const seqOf = id => missions.filter(m => m.camps.includes(id)).sort((a, b) => a.order - b.order);
+  // the part of a campaign that is currently visible (everything, or only up to the current mission when stepping with "progressive view")
+  const stepList = () => missions.filter(m => m.camps.some(c => on.has(c)));      // every mission of the ticked campaigns, in game order, shared ones once
+  const prog = () => $('oProg').checked;
+  const reached = () => { if (!prog()) return null; const l = stepList(), i = l.indexOf(cur); return new Set(i < 0 ? [] : l.slice(0, i + 1)); };      // progressive view: only missions stepped to so far
+  const seqShown = id => { const q = seqOf(id), r = reached(); return r ? q.filter(m => r.has(m)) : q; };
+
+  // ---- data
+  const J = u => fetch(u).then(r => { if (!r.ok) throw new Error(u); return r.json(); });
+  Promise.all([J('stage_music.json'), J('campaign.json'), J('campaign_info.json'), J('campaign_other.json'), J('maps/world_locations.json'), fetch('maps/world_simplemaps.svg').then(r => r.text())])
+    .then(([sm, cj, info, other, wl, svg]) => {
+      // every country outline of the map goes into one group; land and border share a colour, so the borders between countries disappear
+      for (const m of svg.matchAll(/<path\b[^>]*?\sd="([^"]+)"/g)) $('land').appendChild(s('path', { d: m[1], 'vector-effect': 'non-scaling-stroke' }));
+      build(sm, cj, info, other, wl); init(); })
+    .catch(e => { $('detail').textContent = 'Could not load the data files (' + e.message + '). Serve the web folder over http.'; });
+
+  function build(sm, cj, info, other, wl) {
+    const stage = new Map(); sm.stages.forEach(x => { if (!stage.has(x.game_code)) stage.set(x.game_code, x); });
+    const num = code => code.slice(0, 3) + '-' + code.slice(-3);      // FAR-C-093 -> FAR-093 (region + mission number)
+    const mk = o => { o.loc = o.loc || ''; o.map = o.map || o.code.slice(0, 5); missions.push(o); };      // o.map = the game's map (region-letter, e.g. FAR-C): each one has its own dot on the mission-select world map
+    sm.stages.filter(x => x.stage <= 5 && !x.campaign_code).forEach(x => mk({ id: 'T' + x.stage, num: num(x.game_code), code: x.game_code, title: x.title, loc: x.location, camps: ['training'], order: x.stage, boss: false }));
+    cj.missions.forEach(m => {
+      const st = stage.get(m.code), inf = info[m.code] || {};
+      mk({ id: m.code, num: num(m.code), code: m.code, title: inf.name || (st && st.title) || m.code, loc: st ? st.location : '', order: m.order,
+           camps: m.region === 'Special' ? ['special'] : m.xos.map(x => x.toLowerCase()), boss: !!inf.boss, bosses: inf.bosses || [], objectives: inf.objectives || [] });
+    });
+    other.inferno.forEach((x, i) => { const m = /\(([^)]+)\)/.exec(x.location || ''); mk({ id: 'I' + (i + 1), num: num(x.mission), code: x.mission, map: ((/^([A-Z]{3}-[A-Z])/.exec(x.location || '') || [])[1]), title: x.name + ': ' + x.title, loc: m ? m[1] : '', order: 1000 + i, camps: ['inferno'], boss: false, objectives: [x.unlock || ''].filter(Boolean) }); });
+    // position of each mission = the dot of its map on the game's world map (maps/world_locations.json "maps"); the location-name table is only a fallback
+    const PT = wl.maps || {}, FB = wl.locations || {};
+    missions.forEach(m => {
+      m.locName = m.loc; const pt = PT[m.map], fb = FB[m.locName]; let key, lat, lon, approx;
+      if (pt) { lat = pt.lat; lon = pt.lon; approx = pt.conf === 'guess'; key = lat + ',' + lon; } else if (fb) { lat = fb.lat; lon = fb.lon; approx = !!fb.guess; key = m.locName; } else { m.loc = ''; return; }
+      m.loc = key; const L = locs[key] || (locs[key] = { lat, lon, names: [], guess: false, maps: [] });
+      if (!L.names.includes(m.locName)) L.names.push(m.locName); if (!L.maps.includes(m.map)) L.maps.push(m.map); if (approx) L.guess = true;
+    });
+    Object.values(locs).forEach(L => { L.label = L.names.slice(0, 2).join(' / ') + (L.names.length > 2 ? ' +' + (L.names.length - 2) : ''); });
+    missions = missions.filter(m => locs[m.loc]);
+    missions.sort((a, b) => a.order - b.order);
+    byLoc = new Map(); missions.forEach(m => { if (!byLoc.has(m.loc)) byLoc.set(m.loc, []); byLoc.get(m.loc).push(m); });
+  }
+
+  // ---- view (pan / zoom)
+  const svg = $('map'), stageEl = $('stage');
+  const view = { cx: px(18), cy: MAPY + MAPH / 2, w: WW };
+  let k0 = 1;
+  const dims = () => ({ W: stageEl.clientWidth || 1, H: stageEl.clientHeight || 1 });
+  function fit() { const { W, H } = dims(); view.w = Math.max(WW * 1.0, MAPH * W / H); view.cx = px(18); view.cy = MAPY + MAPH / 2; apply(); }
+  const scalables = [];
+  function apply() {
+    const { W, H } = dims();
+    const minW = 60, maxW = Math.max(WW * 1.15, MAPH * 1.1 * W / H);
+    view.w = Math.min(Math.max(view.w, minW), maxW);
+    const kk = W / view.w, vh2 = view.w * H / W;
+    if (view.cx > px(18) + WW / 2) view.cx -= WW; if (view.cx < px(18) - WW / 2) view.cx += WW;
+    view.cy = Math.min(Math.max(view.cy, MAPY), MAPY + MAPH);
+    svg.setAttribute('viewBox', [view.cx - view.w / 2, view.cy - vh2 / 2, view.w, vh2].join(' '));
+    k0 = Math.max(W / Math.max(WW, MAPH * W / H), 0.0001);
+    const z = kk / k0;
+    svg.classList.toggle('near', z >= 2.4);
+    scalables.forEach(o => o.el.setAttribute('transform', 'translate(' + o.x + ' ' + o.y + ')' + (o.rot ? ' rotate(' + o.rot + ')' : '') + ' scale(' + (1 / kk) + ')'));
+  }
+  function zoomAt(f, sx, sy) {
+    const { W, H } = dims(), r = svg.getBoundingClientRect(); if (sx == null) { sx = W / 2; sy = H / 2; } else { sx -= r.left; sy -= r.top; }
+    const wx = view.cx - view.w / 2 + sx / W * view.w, wy = view.cy - view.w * H / W / 2 + sy / W * view.w;
+    view.w /= f; const nw = Math.min(Math.max(view.w, 60), Math.max(WW * 1.15, MAPH * 1.1 * W / H)); view.w = nw;
+    view.cx = wx - sx / W * view.w + view.w / 2; view.cy = wy - sy / W * view.w + view.w * H / W / 2; apply();
+  }
+  let fly = 0;
+  function flyTo(lx, ly, z) {
+    const { W } = dims(), w1 = W / (k0 * z), a = { cx: view.cx, cy: view.cy, w: view.w }, t0 = performance.now(), ms = 550; cancelAnimationFrame(fly);
+    // take the short way round the world
+    if (lx - a.cx > WW / 2) lx -= WW; else if (lx - a.cx < -WW / 2) lx += WW;
+    const step = now => { const t = Math.min((now - t0) / ms, 1), e = t < .5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t);
+      view.cx = a.cx + (lx - a.cx) * e; view.cy = a.cy + (ly - a.cy) * e; view.w = Math.exp(Math.log(a.w) + (Math.log(w1) - Math.log(a.w)) * e); apply(); if (t < 1) fly = requestAnimationFrame(step); };
+    fly = requestAnimationFrame(step);
+  }
+  addEventListener('resize', () => apply());
+  svg.addEventListener('wheel', e => { e.preventDefault(); zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0018)), e.clientX, e.clientY); }, { passive: false });
+  const ptrs = new Map(); let drag = null, moved = 0, pinch = null;
+  svg.addEventListener('pointerdown', e => { svg.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); moved = 0;
+    if (ptrs.size === 1) drag = { x: e.clientX, y: e.clientY, cx: view.cx, cy: view.cy }; else { drag = null; const [a, b] = [...ptrs.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), w: view.w }; } });
+  svg.addEventListener('pointermove', e => {
+    if (!ptrs.has(e.pointerId)) return; ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && ptrs.size === 2) { const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y); view.w = pinch.w * pinch.d / Math.max(d, 1); moved = 99; apply(); return; }
+    if (drag) { const { W } = dims(), dx = e.clientX - drag.x, dy = e.clientY - drag.y; moved = Math.max(moved, Math.hypot(dx, dy)); if (moved > 4) svg.classList.add('drag');
+      view.cx = drag.cx - dx / W * view.w; view.cy = drag.cy - dy / W * view.w; apply(); } });
+  const endP = e => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null; if (!ptrs.size) { drag = null; svg.classList.remove('drag'); } };
+  svg.addEventListener('pointerup', endP); svg.addEventListener('pointercancel', endP);
+  // pointer capture sends the click to the svg itself, so find the marker under the pointer
+  svg.addEventListener('click', e => { if (moved > 4) return; const el = document.elementFromPoint(e.clientX, e.clientY), mk = el && el.closest && el.closest('.mk'); if (mk) { select(mk.dataset.loc, false); return; }
+    // empty map: copy "lat, lon" (decimal, as used in world_locations.json) to the clipboard
+    const p = llAt(e), txt = p.lat.toFixed(1) + ', ' + p.lon.toFixed(1), say = m => { $('ll').textContent = m; setTimeout(() => { $('ll').textContent = fmtLL(p); }, 1500); };
+    const fallback = () => { const t = document.createElement('textarea'); t.value = txt; t.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(t); t.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (x) {} t.remove(); say(ok ? 'Copied ' + txt : 'Copy failed: ' + txt); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(() => say('Copied ' + txt), fallback); else fallback(); });
+  $('zin').onclick = () => zoomAt(1.6); $('zout').onclick = () => zoomAt(1 / 1.6); $('zfit').onclick = fit;
+
+  // ---- static layers
+  function drawLand() {
+    const g = $('landG'); g.textContent = '';
+    for (const k of [-1, 0, 1]) g.appendChild(s('use', { href: '#land', x: k * WW }, { fill: 'var(--land)', stroke: 'var(--land)', 'stroke-width': '1', 'stroke-linejoin': 'round' }));
+  }
+  function drawGrid() {
+    const g = $('gridG'); g.textContent = ''; if (!$('oGrid').checked) return;
+    const x0 = px(-180) - WW, x1 = px(180) + WW, st = { stroke: 'var(--grid)', 'stroke-opacity': '.22', 'stroke-width': '1', 'vector-effect': 'non-scaling-stroke' };
+    for (let lat = -60; lat <= 80; lat += 20) g.appendChild(s('line', { x1: x0, x2: x1, y1: py(lat), y2: py(lat) }, lat === 0 ? Object.assign({}, st, { 'stroke-opacity': '.45', 'stroke-dasharray': '6 4' }) : st));
+    for (let lon = -540; lon <= 540; lon += 30) g.appendChild(s('line', { x1: px(lon), x2: px(lon), y1: -200, y2: MAPH + 200 }, st));
+  }
+
+  // ---- campaign-dependent layers
+  const shown = () => {
+    const r = reached(); if (r) return missions.filter(m => r.has(m));
+    return missions.filter(m => m.camps.some(c => on.has(c)));
+  };
+  function render() {
+    scalables.length = 0; const rg = $('routeG'), mg = $('markG'); rg.textContent = ''; mg.textContent = '';
+    const vis = shown(), active = CAMPS.filter(c => on.has(c.id));
+    // routes: for each ticked campaign, consecutive missions that sit at different places are joined; shared legs get one curve per campaign
+    if ($('oRoute').checked) active.forEach((c, ci) => {
+      if (c.route === false) return;
+      let seq = seqShown(c.id); const bend = 0.1 + ci * 0.07;
+      // the special missions are a chain that continues the story: with a captain's campaign ticked too, it starts from that campaign's last mission (ARC-690 to SPE-700)
+      if (c.id === 'special' && seq.length) { const cap = CAPT.find(id => on.has(id)), end = cap && seqOf(cap).slice(-1)[0]; if (end && (!prog() || reached().has(end))) seq = [end, ...seq]; }      // always positive: legs heading east sag below the straight line (concave up), legs heading west arch above it, so a return trip never lies on the outbound one; stacked campaigns fan out by size
+      for (let i = 1; i < seq.length; i++) {
+        const A = locs[seq[i - 1].loc], B = locs[seq[i].loc]; if (seq[i - 1].loc === seq[i].loc) continue;
+        const ax = px(A.lon), ay = py(A.lat); let bx = px(B.lon); const by = py(B.lat);
+        if (bx - ax > WW / 2) bx -= WW; else if (bx - ax < -WW / 2) bx += WW;
+        const mx = (ax + bx) / 2, my = (ay + by) / 2, dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1, qx = mx - dy / L * L * bend, qy = my + dx / L * L * bend;
+        const t = 0.5, px_ = (1 - t) * (1 - t) * ax + 2 * (1 - t) * t * qx + t * t * bx, py_ = (1 - t) * (1 - t) * ay + 2 * (1 - t) * t * qy + t * t * by;
+        const tdx = 2 * (1 - t) * (qx - ax) + 2 * t * (bx - qx), tdy = 2 * (1 - t) * (qy - ay) + 2 * t * (by - qy), deg = Math.atan2(tdy, tdx) * 180 / Math.PI;
+        for (const o of [-1, 0, 1]) {
+          const grp = s('g'); const p = s('path', { d: 'M' + (ax + o * WW) + ' ' + ay + 'Q' + (qx + o * WW) + ' ' + qy + ' ' + (bx + o * WW) + ' ' + by, fill: 'none' },
+            { stroke: c.color, 'stroke-width': '2', 'stroke-opacity': '.8', 'vector-effect': 'non-scaling-stroke', 'stroke-linecap': 'round' });
+          grp.appendChild(p); rg.appendChild(grp);
+          const ar = s('path', { d: 'M5 0L-4 -4.2L-4 4.2Z' }, { fill: c.color, stroke: 'var(--sea)', 'stroke-width': '1', 'stroke-opacity': '.8' });
+          const ag = s('g'); ag.appendChild(ar); rg.appendChild(ag); scalables.push({ el: ag, x: px_ + o * WW, y: py_, rot: deg });
+        }
+      }
+    });
+    // markers: one per place, ring split by the ticked campaigns that visit it
+    const places = new Map(); vis.forEach(m => { if (!places.has(m.loc)) places.set(m.loc, []); places.get(m.loc).push(m); });
+    [...places.entries()].sort((a, b) => py(locs[a[0]].lat) - py(locs[b[0]].lat)).forEach(([name, ms]) => {
+      const L = locs[name], x = px(L.lon), y = py(L.lat), cs = CAMPS.filter(c => on.has(c.id) && ms.some(m => m.camps.includes(c.id)));
+      for (const o of [-1, 0, 1]) {
+        const g = s('g', { class: 'mk' }); g.dataset.loc = name;
+        g.appendChild(s('circle', { r: 13, fill: 'transparent' }));
+        if (navOpen && cur && cur.loc === name) g.appendChild(s('circle', { r: 11 }, { fill: 'none', stroke: 'var(--accent)', 'stroke-width': '2.5' }));
+        else if (selLoc === name) g.appendChild(s('circle', { r: 11.5, fill: 'none' }, { stroke: 'var(--text)', 'stroke-width': '1.5', 'stroke-dasharray': '3 2' }));
+        g.appendChild(s('circle', { r: 6.5 }, { fill: 'var(--panel)' }));
+        const n = cs.length, r = 6.5;
+        cs.forEach((c, i) => {
+          if (n === 1) { g.appendChild(s('circle', { r }, { fill: 'none', stroke: c.color, 'stroke-width': '4' })); return; }
+          const gap = 0.16, a0 = i / n * 2 * Math.PI - Math.PI / 2 + gap / 2, a1 = (i + 1) / n * 2 * Math.PI - Math.PI / 2 - gap / 2;
+          g.appendChild(s('path', { d: 'M' + r * Math.cos(a0) + ' ' + r * Math.sin(a0) + 'A' + r + ' ' + r + ' 0 ' + (a1 - a0 > Math.PI ? 1 : 0) + ' 1 ' + r * Math.cos(a1) + ' ' + r * Math.sin(a1), fill: 'none' }, { stroke: c.color, 'stroke-width': '4' }));
+        });
+        if (ms.length > 1) { const t = s('text', { 'text-anchor': 'middle', y: 3, 'font-size': 8, 'font-weight': 700 }, { fill: 'var(--text)' }); t.textContent = ms.length; g.appendChild(t); }
+        const lab = s('g', { class: 'lab' });
+        const nm = s('text', { x: 11, y: -2, 'font-size': 12, 'font-weight': 600, class: 'nm' }, { fill: 'var(--text)', stroke: 'var(--sea)', 'stroke-width': '3', 'paint-order': 'stroke' }); nm.textContent = (L.guess ? '≈ ' : '') + L.label;
+        const nums = s('text', { x: 11, y: 11, 'font-size': 10.5, class: 'num2' }, { fill: 'var(--accent)', stroke: 'var(--sea)', 'stroke-width': '3', 'paint-order': 'stroke' });
+        nums.textContent = ms.map(m => m.num).join(' · ');
+        lab.append(nm, nums); g.appendChild(lab);
+        mg.appendChild(g); scalables.push({ el: g, x: x + o * WW, y });
+      }
+    });
+    svg.classList.toggle('nonum', !$('oNum').checked);
+    apply(); renderList(vis); renderNav();
+  }
+
+  function chips(m) { const w = h('span', 'dots'); CAMPS.filter(c => m.camps.includes(c.id)).forEach(c => { const d = h('span', 'dot'); d.style.background = c.color; w.appendChild(d); }); return w; }
+  function missionRow(m, dim) {
+    const r = h('div', 'mrow' + (dim ? ' dim' : '') + (selLoc === m.loc ? ' on' : '')), t = h('div', 't');
+    t.append(h('span', 'num', m.num), h('span', '', m.title), chips(m)); r.appendChild(t);
+    const l = h('div', 'loc', m.locName + (locs[m.loc] && locs[m.loc].guess ? ' ≈' : '')); if (m.boss) { const b = h('span', 'boss', ' ★ ' + (m.bosses && m.bosses.length ? m.bosses.join(', ') : 'boss')); l.appendChild(b); } r.appendChild(l);
+    return r;
+  }
+  function renderList(vis) {
+    $('listHead').textContent = 'Missions shown (' + vis.length + ')'; const box = $('list'); box.textContent = '';
+    vis.forEach(m => { const r = missionRow(m); r.onclick = () => { const i = navOpen ? stepList().indexOf(m) : -1; if (i >= 0) go(i); else select(m.loc, true); }; box.appendChild(r); });
+    if (!vis.length) box.appendChild(h('div', 'sub', 'Tick a campaign above to see its missions.'));
+    renderDetail();
+  }
+  function renderDetail() {
+    const d = $('detail'); d.textContent = ''; d.className = '';
+    if (!selLoc || !byLoc.has(selLoc)) { d.className = 'sub'; d.textContent = 'Click a marker or a mission below.'; return; }
+    const L = locs[selLoc], ms = byLoc.get(selLoc), dv = h('div'); dv.id = 'detailIn';
+    dv.appendChild(h('h3', '', L.names.join(' / ')));
+    dv.appendChild(h('div', 'll', Math.abs(L.lat).toFixed(1) + '°' + (L.lat >= 0 ? 'N' : 'S') + ' ' + Math.abs(L.lon).toFixed(1) + '°' + (L.lon >= 0 ? 'E' : 'W') + ' · game map ' + L.maps.join(', ')));
+    if (L.guess) dv.appendChild(h('div', 'guess', '≈ Position read from the game\'s world map, but which dot belongs to which map here is a guess.'));
+    ms.forEach(m => { const r = missionRow(m, !m.camps.some(c => on.has(c))); r.classList.remove('on'); r.style.cursor = 'default'; if (m.objectives && m.objectives.length) { const u = h('ul', 'obj'); m.objectives.forEach(o => u.appendChild(h('li', '', o))); r.appendChild(u); } dv.appendChild(r); });
+    d.appendChild(dv);
+  }
+  function select(name, fly) {
+    selLoc = selLoc === name && !fly ? null : name; render();
+    if (selLoc && fly) { const L = locs[selLoc]; const { W } = dims(); const z = Math.max(view.w > 0 ? (W / view.w) / k0 : 1, 3); let x = px(L.lon); flyTo(x, py(L.lat), z); }
+  }
+
+  // ---- controls
+  function renderCamps() {
+    const box = $('camps'); box.textContent = '';
+    ['Campaign', 'Extra'].forEach(set => {
+      box.appendChild(h('h2', 'set', set));
+      CAMPS.filter(c => c.set === set).forEach(c => {
+        const n = missions.filter(m => m.camps.includes(c.id)).length, row = h('div', 'camp'), cb = h('input'); cb.type = 'checkbox'; cb.checked = on.has(c.id);
+        cb.onchange = () => { cb.checked ? on.add(c.id) : on.delete(c.id); resetStep(); save(); renderCamps(); render(); };
+        const sw = h('span', 'sw'); sw.style.background = c.color;
+        const bt = h('button', 'cn', c.name); bt.type = 'button'; bt.onclick = () => enterFocus(c.id);
+        if (navOpen && on.size === 1 && on.has(c.id)) bt.style.fontWeight = '700';
+        row.append(cb, sw, bt, h('span', 'n', n)); box.appendChild(row);
+      });
+    });
+  }
+
+  // ---- campaign page: click a campaign name, then step through it with ◀ ▶ / arrow keys
+  // The stepper walks every mission of the ticked campaigns (shared missions once). It is open whenever "Progressive view" is ticked (starting before the first mission, with nothing drawn yet) or after clicking a campaign name.
+  function enterFocus(id) { on = new Set([id]); navOpen = true; cur = null; save(); renderCamps(); go(0); }
+  function resetStep() { if (cur && !stepList().includes(cur)) cur = null; if (!cur && !prog()) navOpen = false; }
+  const stepIdx = () => stepList().indexOf(cur);
+  function go(i) {
+    const l = stepList(); if (!l.length) return; cur = l[Math.min(Math.max(i, 0), l.length - 1)]; navOpen = true; selLoc = cur.loc; render();
+    const L = locs[cur.loc]; flyTo(px(L.lon), py(L.lat), Math.max((dims().W / view.w) / k0, 2.6));
+  }
+  function renderNav() {
+    const l = stepList(), open = navOpen && l.length > 0; $('nav').style.display = open ? 'flex' : 'none'; $('stage').classList.toggle('nav-on', !!open); if (!open) return;
+    const i = l.indexOf(cur), t = $('nTxt'), names = CAMPS.filter(c => on.has(c.id)).map(c => c.name).join(' + '); t.textContent = '';
+    if (i < 0) t.append(h('b', '', names), h('span', '', 'Press ▶ or → to start at the first mission'));
+    else t.append(h('b', '', cur.num + (cur.boss ? ' ★' : '') + ' · ' + cur.title), h('div', '', cur.locName + (locs[cur.loc].guess ? ' ≈' : '')), h('span', '', names + ' · ' + (i + 1) + ' / ' + l.length));
+    $('nPrev').disabled = i <= 0; $('nNext').disabled = i === l.length - 1;
+  }
+  const stopStep = () => { cur = null; navOpen = prog(); selLoc = null; render(); fit(); };
+  $('nPrev').onclick = () => { if (stepIdx() > 0) go(stepIdx() - 1); }; $('nNext').onclick = () => go(stepIdx() + 1); $('nExit').onclick = stopStep;
+  addEventListener('keydown', e => { if (!navOpen || /INPUT|TEXTAREA|SELECT/.test((e.target.tagName || ''))) return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); go(stepIdx() + 1); } else if (e.key === 'ArrowLeft') { e.preventDefault(); if (stepIdx() > 0) go(stepIdx() - 1); } else if (e.key === 'Escape') stopStep(); });
+
+  // ---- cursor position readout (click the map to copy "lat, lon" for world_locations.json)
+  function llAt(e) { const { W, H } = dims(), r = svg.getBoundingClientRect(), wx = view.cx - view.w / 2 + (e.clientX - r.left) / W * view.w, wy = view.cy - view.w * H / W / 2 + (e.clientY - r.top) / W * view.w;
+    let lon = (wx - X0) / KX; lon = ((lon + 180) % 360 + 360) % 360 - 180; return { lat: (Y0 - wy) / KY, lon }; }
+  const fmtLL = p => Math.abs(p.lat).toFixed(2) + '°' + (p.lat >= 0 ? 'N' : 'S') + ' ' + Math.abs(p.lon).toFixed(2) + '°' + (p.lon >= 0 ? 'E' : 'W');
+  svg.addEventListener('pointermove', e => { $('ll').textContent = fmtLL(llAt(e)); });
+  svg.addEventListener('pointerleave', () => { $('ll').textContent = ''; });
+  function save() { try { history.replaceState(null, '', '#c=' + [...on].join(',')); } catch (e) {} }
+  function load() { const m = /[#&]c=([^&]*)/.exec(location.hash); if (m) { const ids = m[1].split(',').filter(x => CAMP[x]); on = new Set(ids); } }
+  ['oRoute', 'oNum'].forEach(id => $(id).onchange = render);
+  $('oProg').onchange = () => { cur = null; selLoc = null; navOpen = prog(); render(); if (navOpen) fit(); }; $('oGrid').onchange = () => { drawGrid(); apply(); };
+  function init() { load(); drawLand(); drawGrid(); renderCamps(); fit(); render(); }
+})();
+</script></body></html>

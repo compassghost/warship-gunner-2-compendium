@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Warship Gunner 2 Compendium</title>
+<style>
+  :root{--bg:#0b1220;--panel:#141f33;--line:#3b4d6b;--text:#e8eef9;--muted:#9fb0c8;--accent:#4cc2ff;--w:#f2b84b;--t:#5ad19a;--b:#ff7a7a;--node:#1b2a45}
+  @media (prefers-color-scheme:light){:root{--bg:#f6f8fc;--panel:#fff;--line:#b8c4d6;--text:#16202e;--muted:#566377;--accent:#0b72c9;--w:#b87500;--t:#117a4d;--b:#c23030;--node:#eef3fb}}
+  body{margin:0;padding:16px 20px 40px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.4}
+  h1{font-size:20px;margin:0 0 4px} p{margin:4px 0 12px;color:var(--muted);font-size:14px} a{color:var(--accent)}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+  button.xo{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 14px;font:inherit;cursor:pointer}
+  button.xo[aria-pressed=true]{outline:2px solid var(--accent)}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+  .wrap{display:flex;gap:16px;align-items:flex-start}
+  #chart{flex:0 0 auto;overflow-x:auto;max-width:100%}
+  #side{flex:1 1 280px;position:sticky;top:calc(var(--sn-h,0px) + 12px);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;min-width:260px;max-height:calc(100vh - var(--sn-h,0px) - 24px);overflow:auto}
+  .dchips{display:flex;flex-wrap:wrap;gap:6px} .dchip{width:150px;min-height:44px;box-sizing:border-box;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--node);color:var(--text);text-decoration:none;text-align:center} .dtop{font-size:14px;font-weight:700} .dfull{font-size:11px;color:var(--muted);margin-top:1px} a.dchip:hover{border-color:var(--accent)}
+  #side h2{font-size:16px;margin:0 0 6px} #side h3{font-size:13px;margin:12px 0 4px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  #side ul{margin:0;padding-left:18px;font-size:14px} #side .none{color:var(--muted);font-size:14px}
+  .boss{margin:6px 0 12px;max-width:500px} .boss .bt{font-size:14px;font-weight:700;margin:0 0 4px} .boss .bt small{font-weight:400;color:var(--muted)}
+  a.shot{display:block;position:relative;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:linear-gradient(#5b7fa6,#2c3f58);color:inherit;text-decoration:none}
+  a.shot:hover,a.shot:focus-visible{border-color:var(--accent)} a.shot canvas{display:block;width:100%;height:auto}
+  a.shot span{position:absolute;left:0;right:0;bottom:0;padding:2px 6px;font-size:11px;color:#e8eef9;background:rgba(10,18,32,.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .parts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:6px} .bnote{font-size:12px;color:var(--muted);margin:6px 0 0}
+  svg text{fill:var(--text);font-family:inherit}
+  .rg{fill:var(--muted)!important;font-size:12px;font-weight:600;letter-spacing:.06em}
+  .lane{fill:var(--muted)!important;font-size:12px}
+  .node{cursor:pointer}
+  @media (max-width:800px){.wrap{flex-direction:column}#side{position:static;max-height:none;width:auto;min-width:0;flex:none}.boss{max-width:100%}}
+</style><script src="shell.js" defer></script></head><body><script src="nav.js"></script>
+<h1>Missions</h1>
+<p>The story flows downward. Missions in all three columns are shared; a mission in one or two columns is only played by that captain or pair. A red <span style="color:var(--b)">★</span> marks a stage with a boss (superweapon). See <a href="rewards.html">Rewards</a> for the Inferno, Survival and kill awards.</p>
+<div class="bar" id="bar"></div>
+<div class="wrap"><div id="chart"></div>
+<aside id="side"><p class="none">Click a mission to see its details.</p></aside></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// Superweapon viewers (models/bosses.json lists a boss's component models). All viewers share ONE WebGL renderer: every frame it draws each visible model into
+// its own plain 2D canvas, at that canvas's real pixel size (so it is sharp) and slowly turning. A browser only allows a handful of WebGL contexts, one per model would not scale.
+let bossData = null, modelIdx = null, liveR = null, lastT = null, BUF_W = 3000, BUF_H = 2000;
+const live = new Set(), VIEW_W = 3000, VIEW_H = 2000,      // drawing buffer: larger than any panel at any pixel density, otherwise a big panel is stretched (smeared). Each viewer only draws the corner it needs.
+ calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+fetch('models/bosses.json').then(r => r.json()).then(b => { bossData = b; if (typeof shown !== 'undefined' && shown) showMission(shown); }).catch(() => {});
+let composites = [];      // assembled bosses (models/composites.json, tools/build_composite.py): shown instead of the single pieces
+fetch('models/composites.json').then(r => r.json()).then(c => { composites = c; if (typeof shown !== 'undefined' && shown) showMission(shown); }).catch(() => {});
+const normBoss = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+// map icons: stage location (stage_music.json) -> map record (maps/mission_maps.json) -> minimap image (maps/maps.json; of three images the second is the shaded relief with grid)
+let mapRecs = {}, mapLoc = {};
+Promise.all([fetch('maps/maps.json').then(r => r.json()), fetch('maps/mission_maps.json').then(r => r.json())]).then(([recs, mm]) => { recs.forEach(r => mapRecs[r.rec] = r.images); mapLoc = mm.codes || {}; if (typeof data !== 'undefined' && data) draw(); if (typeof shown !== 'undefined' && shown) showMission(shown); }).catch(() => {});
+const mapUrl = sm => { const im = sm && mapRecs[mapLoc[(sm.game_code || '').slice(0, 5)]]; return im && im.length ? 'maps/map_' + (im.length > 1 ? im[1] : im[0]) + '.png' : null; };
+// stage music (stage_music.json, built by tools/build_stage_music.py): each stage has one out-of-combat and one in-combat track
+let stageMusic = {}, infernoStage = {}, tutStages = [];
+fetch('stage_music.json').then(r => r.json()).then(sm => { sm.pairs10 = sm.pairs.find(p => p.pair === 10); sm.stages.forEach(s => { if (s.campaign_code) stageMusic[s.campaign_code] = Object.assign({ p10: sm.pairs10 }, s); else if (!/^HEL/.test(s.game_code)) { stageMusic[s.game_code] = Object.assign({ p10: sm.pairs10 }, s); tutStages.push(s); } const im = /^INFERNO (\d)$/.exec(s.title); if (im) infernoStage[im[1]] = Object.assign({ p10: sm.pairs10 }, s); }); if (typeof data !== 'undefined' && data) draw(); if (typeof shown !== 'undefined' && shown) showMission(shown); }).catch(() => {});
+// play a track in the music player: inside player.html the player is the parent frame; on its own the page opens itself in the player (press play there)
+function playTrack(id, code) { if (window.top !== window) parent.postMessage({ wg2play: id }, location.origin); else location.href = 'player.html#/campaign.html#' + code; }
+function musicBlock(s, code) {
+  const box = document.createElement('div'), m = s.music, nm = id => id ? id.replace(/^DBG[M2]_/, '') : '';
+  const row = (role, id, note) => { const r = document.createElement('div'); r.style.cssText = 'display:flex;gap:8px;align-items:center;margin:3px 0;font-size:14px'; const b = document.createElement('button'); b.type = 'button'; b.className = 'xo'; b.style.padding = '2px 10px'; b.textContent = '▶ ' + nm(id); b.title = 'Play ' + id + ' in the music player'; b.onclick = () => playTrack(id, code); const t = document.createElement('span'); t.textContent = role + (note ? ' (' + note + ')' : ''); t.style.color = 'var(--muted)'; r.append(b, t); return r; };
+  box.appendChild(row('Out of combat', m.out_of_combat));
+  if (m.in_combat) box.appendChild(row('In combat', m.in_combat));
+  else if (s.p10 && m.pair === 10 && s.p10.out_of_combat === m.out_of_combat) box.appendChild(row('In combat', 'DBGM_B18', 'set by a script event, inferred from the game code'));
+  return box;
+}
+const io = new IntersectionObserver(es => es.forEach(e => { if (e.target._live) e.target._live.vis = e.isIntersecting; }));
+async function live3d(id, ratio, cv) {
+  if (!window.THREE) return;
+  if (!modelIdx) modelIdx = Promise.all([fetch('models/index.json').then(r => r.json()), fetch('models/composites.json').then(r => r.json()).catch(() => [])]).then(([a, b]) => a.concat(b));
+  const m = (await modelIdx).find(x => x.id === id); if (!m) return;
+  const buf = await (await fetch('models/' + id + '.bin')).arrayBuffer(); if (!cv.isConnected) return;
+  if (m.all) return liveComposite(m, buf, ratio, cv);
+  const p = m.parts[0], dv = new DataView(buf), qo = p.v * 12, uo = qo + p.q * 8, pos = [], uv = [];       // part 0 = full detail: Float32 xyz, Uint16 quads, Uint16 uv pairs (as in models.html)
+  for (let k = 0; k < p.q; k++) {
+    const q4 = [0, 1, 2, 3].map(j => dv.getUint16(qo + (k * 4 + j) * 2, true));
+    for (const t of (q4[2] === q4[3] ? [[0, 1, 2]] : [[0, 1, 2], [0, 2, 3]])) for (const c of t) {
+      const vi = q4[c]; pos.push(dv.getFloat32(vi * 12, true), dv.getFloat32(vi * 12 + 4, true), dv.getFloat32(vi * 12 + 8, true));
+      uv.push(dv.getUint16(uo + (k * 8 + c * 2) * 2, true) / 16384, dv.getUint16(uo + (k * 8 + c * 2 + 1) * 2, true) / 16384);
+    }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals(); g.computeBoundingBox();
+  const ctr = new THREE.Vector3(); g.boundingBox.getCenter(ctr); g.translate(-ctr.x, -ctr.y, -ctr.z); g.computeBoundingSphere(); const r = g.boundingSphere.radius;
+  const tex = m.tex != null ? await new Promise(res => new THREE.TextureLoader().load('models/' + id + '.png', res, undefined, () => res(null))) : null;
+  if (!cv.isConnected) { g.dispose(); return; }
+  if (tex) { tex.flipY = false; tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.encoding = THREE.sRGBEncoding; }       // default filtering, as in models.html (anisotropic filtering exaggerates the hairline texture detail)
+  const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: tex ? 0xffffff : 0x8fb4d8, map: tex, metalness: 0.05, roughness: 0.8, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1, transparent: !!tex, alphaTest: tex ? 0.4 : 0 }));      // same offset as models.html
+  mesh.rotation.x = -Math.PI / 2; mesh.rotation.z = 0.7;                       // data is z-up; turning about the up axis
+  const scene = new THREE.Scene(); scene.add(mesh); scene.add(new THREE.HemisphereLight(0xffffff, 0x667788, 1.6)); const dl = new THREE.DirectionalLight(0xffffff, 1.0); dl.position.set(1, 2, 1.5); scene.add(dl);
+  // near / far hug the model's bounding sphere (camera distance d +- r): a deep range leaves too little depth precision, so overlapping surfaces fight and smear
+  const dist = r * Math.hypot(0.8, 2.8), cam = new THREE.PerspectiveCamera(35, ratio, dist - r * 1.05, dist + r * 1.05); cam.position.set(0, r * 0.8, r * 2.8); cam.lookAt(0, 0, 0);      // r is the box's bounding sphere, which is larger than the model itself
+  if (!liveR) { liveR = new THREE.WebGLRenderer({ antialias: true, alpha: true }); liveR.setPixelRatio(1); liveR.setSize(VIEW_W, VIEW_H, false);
+    { const gl = liveR.getContext(); if (gl.drawingBufferWidth !== VIEW_W || gl.drawingBufferHeight !== VIEW_H) liveR.setSize(gl.drawingBufferWidth, gl.drawingBufferHeight, false); BUF_W = gl.drawingBufferWidth; BUF_H = gl.drawingBufferHeight; }      // phones may give a smaller drawing buffer than asked for; use what we really got or the picture is cropped and squashed
+    liveR.setClearColor(0x000000, 0); requestAnimationFrame(liveFrame); }
+  const it = { cv, ratio, scene, cam, mesh, g, tex, vis: false }; cv._live = it; live.add(it); io.observe(cv);
+}
+// an assembled boss (models/composites.json): every part drawn together, each with the texture of the model named in its texid
+async function liveComposite(m, buf, ratio, cv) {
+  let off = 0; const gs = [], parts = [];
+  for (const p of m.parts) {
+    const dv = new DataView(buf, off), qo = p.v * 12, uo = qo + p.q * 8, pos = [], uv = [];
+    for (let k = 0; k < p.q; k++) {
+      const q4 = [0, 1, 2, 3].map(j => dv.getUint16(qo + (k * 4 + j) * 2, true));
+      for (const t of (q4[2] === q4[3] ? [[0, 1, 2]] : [[0, 1, 2], [0, 2, 3]])) for (const c of t) {
+        const vi = q4[c]; pos.push(dv.getFloat32(vi * 12, true), dv.getFloat32(vi * 12 + 4, true), dv.getFloat32(vi * 12 + 8, true));
+        uv.push(dv.getUint16(uo + (k * 8 + c * 2) * 2, true) / 16384, dv.getUint16(uo + (k * 8 + c * 2 + 1) * 2, true) / 16384);
+      }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals(); g.computeBoundingBox();
+    gs.push(g); parts.push(p); off += p.v * 12 + p.q * 24;
+  }
+  const box = new THREE.Box3(); gs.forEach(g => box.union(g.boundingBox)); const ctr = new THREE.Vector3(); box.getCenter(ctr); let r = 0;
+  gs.forEach(g => { g.translate(-ctr.x, -ctr.y, -ctr.z); g.computeBoundingSphere(); r = Math.max(r, g.boundingSphere.center.length() + g.boundingSphere.radius); });
+  const texs = await Promise.all(parts.map(p => new Promise(res => new THREE.TextureLoader().load('models/' + p.texid + '.png', res, undefined, () => res(null)))));
+  if (!cv.isConnected) { gs.forEach(g => g.dispose()); return; }
+  const grp = new THREE.Group(), mats = [];
+  gs.forEach((g, i) => { const tex = texs[i]; if (tex) { tex.flipY = false; tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.encoding = THREE.sRGBEncoding; }
+    const mat = new THREE.MeshStandardMaterial({ color: tex ? 0xffffff : 0x8fb4d8, map: tex, metalness: 0.05, roughness: 0.8, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1, transparent: !!tex, alphaTest: tex ? 0.4 : 0 });
+    mats.push(mat); grp.add(new THREE.Mesh(g, mat)); });
+  grp.rotation.x = -Math.PI / 2; grp.rotation.z = 0.7;
+  const scene = new THREE.Scene(); scene.add(grp); scene.add(new THREE.HemisphereLight(0xffffff, 0x667788, 1.6)); const dl = new THREE.DirectionalLight(0xffffff, 1.0); dl.position.set(1, 2, 1.5); scene.add(dl);
+  const dist = r * Math.hypot(0.8, 2.8), cam = new THREE.PerspectiveCamera(35, ratio, dist - r * 1.05, dist + r * 1.05); cam.position.set(0, r * 0.8, r * 2.8); cam.lookAt(0, 0, 0);
+  if (!liveR) { liveR = new THREE.WebGLRenderer({ antialias: true, alpha: true }); liveR.setPixelRatio(1); liveR.setSize(VIEW_W, VIEW_H, false);
+    { const gl = liveR.getContext(); if (gl.drawingBufferWidth !== VIEW_W || gl.drawingBufferHeight !== VIEW_H) liveR.setSize(gl.drawingBufferWidth, gl.drawingBufferHeight, false); BUF_W = gl.drawingBufferWidth; BUF_H = gl.drawingBufferHeight; }
+    liveR.setClearColor(0x000000, 0); requestAnimationFrame(liveFrame); }
+  const it = { cv, ratio, scene, cam, mesh: grp, g: gs, tex: texs.filter(Boolean), mats, vis: false }; cv._live = it; live.add(it); io.observe(cv);
+}
+function liveFrame(t) {
+  const dt = lastT === null ? 0 : Math.min(50, t - lastT); lastT = t; const dpr = Math.min(2, devicePixelRatio || 1);
+  for (const it of [...live]) {
+    if (!it.cv.isConnected) { [].concat(it.g).forEach(g => g.dispose()); [].concat(it.tex || []).forEach(x => x.dispose()); (it.mats || [it.mesh.material]).forEach(x => x.dispose()); live.delete(it); io.unobserve(it.cv); continue; }    // the panel was rebuilt
+    const cw = it.cv.clientWidth; if (!it.vis || !cw) continue;
+    let W = Math.min(BUF_W, Math.round(cw * dpr)), H = Math.round(W / it.ratio); if (H > BUF_H) { H = BUF_H; W = Math.round(H * it.ratio); }      // keep the aspect ratio if the buffer is the limit
+    if (it.cv.width !== W || it.cv.height !== H) { it.cv.width = W; it.cv.height = H; }
+    if (!calm) it.mesh.rotation.z -= dt * 0.0004;
+    it.cam.aspect = W / H; it.cam.updateProjectionMatrix();
+    liveR.setViewport(0, 0, W, H); liveR.setScissor(0, 0, W, H); liveR.setScissorTest(true); liveR.clear(); liveR.render(it.scene, it.cam);
+    const cx = it.cv.getContext('2d'); cx.clearRect(0, 0, W, H);       // clear first: the 3D image has transparent areas, so without this every earlier frame shows through as a smeared trail
+    cx.drawImage(liveR.domElement, 0, BUF_H - H, W, H, 0, 0, W, H);       // the WebGL buffer's origin is bottom-left
+  }
+  requestAnimationFrame(liveFrame);
+}
+function shotLink(id, label, w, h) {
+  const a = document.createElement('a'); a.className = 'shot'; a.href = 'models.html#' + id; a.title = label + ' - open in the model viewer';
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const s = document.createElement('span'); s.textContent = label; a.append(cv, s); live3d(id, w / h, cv); return a;
+}
+// one block per superweapon of a mission: the main model, then every component (units that share a model are listed once per entity)
+function bossBlocks(names) {
+  const out = [];
+  for (const nm of names) {
+    const gid = bossData && bossData.keys[normBoss(nm)], g = gid && bossData.groups[gid], box = document.createElement('div'); box.className = 'boss';
+    const t = document.createElement('div'); t.className = 'bt'; t.textContent = nm; box.appendChild(t);
+    if (!g) { out.push(box); continue; }
+    if (normBoss(g.title) !== normBoss(nm)) { const sm = document.createElement('small'); sm.textContent = ' (uses the ' + g.title + ' model)'; t.appendChild(sm); }
+    const comp = composites.find(c => c.boss && normBoss(c.boss) === normBoss(g.title));
+    if (comp) { box.appendChild(shotLink(comp.id, nm, 280, 170)); out.push(box); continue; }       // an assembled boss replaces the single pieces
+    box.appendChild(shotLink(g.parts[0].model, nm, 280, 170));
+    const rest = g.parts.slice(1);
+    if (rest.length) {
+      const n = document.createElement('div'); n.className = 'bnote'; n.textContent = 'Also in this superweapon: ' + rest.length + ' separate model' + (rest.length > 1 ? 's' : '') + (rest.some(p => p.role === 'other') ? ' (unnamed ones are labelled with their file name)' : ''); box.appendChild(n);
+      const grid = document.createElement('div'); grid.className = 'parts'; rest.forEach(p => grid.appendChild(shotLink(p.model, p.label, 136, 90))); box.appendChild(grid);
+      const note = document.createElement('div'); note.className = 'bnote'; note.textContent = 'How these are positioned relative to each other in the mission is not decoded yet, so they are shown separately.'; box.appendChild(note);
+    }
+    out.push(box);
+  }
+  return out;
+}
+const COL = { Werner: 'var(--w)', Tsukuba: 'var(--t)', Braun: 'var(--b)' };
+const NS = 'http://www.w3.org/2000/svg';
+const el = (n, a, p) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+const LANEW = 150, GAP = 14, NH = 34, STEP = 52, TOP = 34, LEFT = 8;
+let data, rewards = {}, info = {}, xo = null, picked = null, secY = {};
+// missions where the storyline splits: { 'MISSION-CODE': [[captain, what to do], ...] } (empty in this scaffold; fill it from your own notes)
+const SPLIT = {};
+const LANES = ['Werner', 'Tsukuba', 'Braun'];
+function draw() {
+  const host = document.getElementById('chart'); host.replaceChildren();
+  const laneX = k => LEFT + k * (LANEW + GAP), W = LEFT * 2 + 3 * LANEW + 2 * GAP;
+  // gray panels (tutorial, SPE, Inferno) are independent of the campaign: no colour strip, no connectors, not dimmed by the captain filter
+  const rows = []; let y = 4, lastRegion = null; secY = {};
+  const tutRows = tutStages.map(s => ({ code: s.game_code, region: 'Tutorial', xos: LANES, title: s.title, gray: true })),
+    infRows = inferno.map((x, k) => ({ code: x.name, region: 'Inferno', xos: LANES, inf: k, gray: true })),
+    speRows = data.missions.filter(m => m.region === 'Special').map(m => Object.assign({ gray: true }, m)),
+    campRows = data.missions.filter(m => m.region !== 'Special');
+  const plates = () => { rows.push({ plates: true, y }); y += 40; };
+  if (!tutRows.length) plates();
+  const seq = tutRows.concat(campRows, speRows, infRows);
+  for (const m of seq) {
+    if (m.region !== lastRegion) { if (lastRegion === 'Tutorial') plates(); else if (m.region === 'Special' || m.region === 'Inferno') y += 8; secY[m.region] = y; rows.push({ head: m.region, y }); y += 26; lastRegion = m.region; }
+    rows.push({ m, y }); y += STEP;
+  }
+  const svg = el('svg', { width: W, height: y + 10, viewBox: `0 0 ${W} ${y + 10}` }); host.appendChild(svg);
+  const boxes = rows.filter(r => r.m).map(r => { const ks = r.m.xos.map(n => LANES.indexOf(n)), lo = Math.min(...ks), hi = Math.max(...ks); return Object.assign(r, { ks, lo, hi, x: laneX(lo), w: laneX(hi) + LANEW - laneX(lo) }); });
+  // connectors first so boxes sit on top: per lane, from one mission down to the next mission that includes the lane
+  LANES.forEach((n, k) => {
+    let prev = null; const cx = laneX(k) + LANEW / 2, on = xo === null || xo === n;
+    for (const b of boxes) { if (!b.ks.includes(k) || b.m.gray) continue; if (prev) {
+      const ln = el('line', { x1: cx, x2: cx, y1: prev.y + NH, y2: b.y, stroke: COL[n], 'stroke-width': 2, 'stroke-opacity': on ? .85 : .2 }, svg); }
+      prev = b; }
+  });
+  // gray line down the middle: ARC-Z-690 -> SPE-A-700 ... SPE-G-760 are played in order whatever the captain
+  { const chain = boxes.filter(b => b.m.code === 'ARC-Z-690' || b.m.region === 'Special'), mx = laneX(1) + LANEW / 2;
+    for (let i = 1; i < chain.length; i++) el('line', { x1: mx, x2: mx, y1: chain[i - 1].y + NH, y2: chain[i].y, stroke: 'var(--muted)', 'stroke-width': 2, 'stroke-opacity': .7 }, svg); }
+  for (const r of rows) {
+    if (r.head) { const t = el('text', { x: LEFT, y: r.y + 16, class: 'rg' }, svg); t.textContent = r.head.toUpperCase(); continue; }
+    if (r.plates) {
+      // captain nameplates just before the first campaign mission; hover for how to get on that path
+      LANES.forEach((n, k) => { const g = el('g', {}, svg), x = laneX(k);
+        el('rect', { x, y: r.y + 2, width: LANEW, height: 30, rx: 6, fill: 'var(--node)', stroke: COL[n], 'stroke-width': 2 }, g);
+        const t = el('text', { x: x + LANEW / 2, y: r.y + 22, 'text-anchor': 'middle', 'font-size': 14, 'font-weight': 700 }, g); t.textContent = n;
+      });
+      continue;
+    }
+    const b = r, m = r.m, on = m.gray || xo === null || m.xos.includes(xo), sel = picked === m.code;
+    const g = el('g', { class: 'node', opacity: on ? 1 : .35 }, svg);
+    g.addEventListener('click', () => { picked = m.code; if (m.inf !== undefined) showInferno(m.inf); else showMission(m); draw(); });
+    el('rect', { x: b.x, y: r.y, width: b.w, height: NH, rx: 6, fill: 'var(--node)', stroke: sel ? 'var(--accent)' : 'var(--line)', 'stroke-width': sel ? 2.5 : 1 }, g);
+    // colour strip along the top of the box: one segment per lane, filled where that captain plays the mission
+    if (m.gray) el('rect', { x: b.x, y: r.y, width: b.w, height: 4, fill: 'var(--muted)', opacity: .6 }, g);
+    else for (let k = b.lo; k <= b.hi; k++) el('rect', { x: laneX(k) + (k === b.lo ? 0 : -GAP) + (k === b.lo ? 0 : 0), y: r.y, width: LANEW + (k === b.lo ? 0 : GAP), height: 4, fill: m.xos.includes(LANES[k]) ? COL[LANES[k]] : 'transparent' }, g);
+    const t = el('text', { x: b.x + b.w / 2, y: r.y + 23, 'text-anchor': 'middle', 'font-size': 13 }, g); t.textContent = m.code;
+    { const sm = m.inf !== undefined ? { game_code: inferno[m.inf].location, location: inferno[m.inf].location } : stageMusic[m.code], mu = mapUrl(sm); if (mu) { const ic = el('image', { href: mu, x: b.x + 6, y: r.y + 8, width: 22, height: 22, preserveAspectRatio: 'xMidYMid slice' }, g); el('title', {}, ic).textContent = sm.location; } }
+    if (SPLIT[m.code]) { const sx = b.x + b.w - 11, sy = r.y + NH / 2 + 2; el('circle', { cx: sx, cy: sy, r: 8, fill: 'var(--accent)' }, g); const st = el('text', { x: sx, y: sy + 5, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': 700, style: 'fill:#fff' }, g); st.textContent = '⑂'; el('title', {}, g).textContent = 'Storyline splits here'; }
+    if ((info[m.code] || {}).boss) {
+      // boss mark: a badge on the box's right edge
+      const bx = b.x + b.w - 11, by = r.y + NH / 2 + 2;
+      el('circle', { cx: bx, cy: by, r: 8, fill: 'var(--b)' }, g);
+      const bt = el('text', { x: bx, y: by + 4, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 700, style: 'fill:#fff' }, g); bt.textContent = '★';
+      el('title', {}, g).textContent = 'Boss stage';
+    }
+  }
+  host.appendChild(svg);
+}
+function list(title, arr) {
+  if (!arr || !arr.length) return '';
+  return `<h3>${title}</h3><ul>${arr.map(s => `<li>${s.replace(/[<&]/g, c => c === '<' ? '&lt;' : '&amp;')}</li>`).join('')}</ul>`;
+}
+let dep = 1, shown = null, links = {}, labels = {}, fulls = {}, bosses = {}, bossBehavior = {};
+const EMOJI = { S: '🥇', A: '🥈', T: '💰', 1: '🏆' };
+// one drop as a chip: top line the tree abbreviation (with a rank emoji or a prefix), bottom line the full name
+function chip(x, prefix) {
+  const m2 = x.match(/^([SAT1]):\s*(.*)$/), body = m2 ? m2[2] : x, key = body.replace(/(\s*\([^)]*\))+\s*$/, '').trim(), lk = links[key];
+  const label = lk && lk.g && labels[lk.g + ':' + lk.i] ? labels[lk.g + ':' + lk.i] : (lk && lk.flag) || (lk && lk.cls) || key;
+  const el = document.createElement(lk ? 'a' : 'span'); el.className = 'dchip'; el.title = key;
+  if (lk) el.href = lk.flag ? 'flags.html#' + encodeURIComponent(lk.flag) : 'tree.html#' + (lk.cls ? 'cls:' + encodeURIComponent(lk.cls) : lk.g + ':' + lk.i);
+  const top = document.createElement('div'); top.className = 'dtop';
+  if (m2) { const e = document.createElement('span'); e.textContent = EMOJI[m2[1]]; e.style.marginRight = '4px'; top.appendChild(e); }
+  if (prefix) { const e = document.createElement('span'); e.textContent = prefix; e.style.cssText = 'margin-right:4px;color:var(--muted)'; top.appendChild(e); }
+  top.append(label); el.appendChild(top);
+  const full = lk && lk.g ? fulls[lk.g + ':' + lk.i] : '';
+  if (full && full !== label) { const b = document.createElement('div'); b.className = 'dfull'; b.textContent = full; el.appendChild(b); }
+  return el;
+}
+let inferno = [];
+function showInferno(k) {
+  const x = inferno[k], s = document.getElementById('side'), sm = infernoStage[k + 1]; shown = null; s.replaceChildren();
+  const h = document.createElement('h2'); h.textContent = x.name; s.appendChild(h);
+  const t = document.createElement('div'); t.textContent = x.title; t.style.cssText = 'font-size:15px;margin:-2px 0 6px'; s.appendChild(t);
+  const p = (label, v) => { if (!v) return; const d = document.createElement('div'); d.style.cssText = 'font-size:13px;margin:3px 0'; const b = document.createElement('span'); b.style.color = 'var(--muted)'; b.textContent = label + ': '; d.append(b, v); s.appendChild(d); };
+  p('Where', x.location); p('Unlock', x.unlock); p('Reward', x.reward);
+  if (sm && sm.music && sm.music.pair) { const h3 = document.createElement('h3'); h3.textContent = 'Music'; s.append(h3, musicBlock(sm, 'inferno-' + (k + 1))); }
+}
+function showMission(m) {
+  shown = m;
+  const s = document.getElementById('side'), i = info[m.code] || { name: m.title }, rw = rewards[m.code] || { d1: [], d2: [] };
+  s.replaceChildren();
+  const h = document.createElement('h2'); h.textContent = m.code; s.appendChild(h);
+  if (i.name) { const n = document.createElement('div'); n.textContent = i.name; n.style.cssText = 'font-size:15px;margin:-2px 0 6px'; s.appendChild(n); }
+  { const num = (m.code.match(/(\d{3})$/) || [])[1];      // link to this mission's dialogue on the Story page (the route filter above picks that adjutant's version)
+    if (num) { const a = document.createElement('a'), r = xo && +num >= 60 && +num <= 690 && (m.xos || []).includes(xo) ? xo.toLowerCase() : 'all'; a.href = 'story.html#' + r + '/' + num; a.textContent = 'Read the story →'; a.style.cssText = 'display:inline-block;font-size:13px;margin:0 0 8px'; s.appendChild(a); } }
+  { const loc = (stageMusic[m.code] || {}).location; if (loc) { const lc = document.createElement('div'); lc.style.cssText = 'font-size:13px;color:var(--muted);margin:0 0 6px'; lc.textContent = loc; s.appendChild(lc); const mu = mapUrl(stageMusic[m.code]); if (mu) { const im = document.createElement('img'); im.src = mu; im.alt = 'Minimap of ' + loc; im.style.cssText = 'width:150px;height:150px;border-radius:6px;border:1px solid var(--line);display:block;margin:0 0 8px'; s.appendChild(im); } } }
+  const add = (title, arr) => { if (!arr || !arr.length) return; const t = document.createElement('h3'); t.textContent = title; const ul = document.createElement('ul'); arr.forEach(x => ul.appendChild(x)); s.append(t, ul); };
+  const li = txt => { const e = document.createElement('li'); e.textContent = txt; return e; };
+  add('Objective', (i.objectives || []).map(li));
+  if (SPLIT[m.code]) { const t = document.createElement('h3'); t.textContent = 'Storyline splits here'; const ul = document.createElement('ul'); SPLIT[m.code].forEach(([who, what]) => { const e = document.createElement('li'), b = document.createElement('b'); b.textContent = who + ': '; e.append(b, what); ul.appendChild(e); }); s.append(t, ul); }
+  { const sm = stageMusic[m.code]; if (sm && sm.music && sm.music.pair) { const t = document.createElement('h3'); t.textContent = 'Music'; s.append(t, musicBlock(sm, m.code)); } }
+  if (i.boss) {
+    if (i.bosses && i.bosses.length && bossData) { const t = document.createElement('h3'); t.textContent = 'Superweapon'; s.appendChild(t); bossBlocks(i.bosses).forEach(b => s.appendChild(b)); }
+    else add('Superweapon', (i.bosses && i.bosses.length ? i.bosses : ['Unnamed']).map(li));
+  }
+  { const bb = bossBehavior[m.code]; if (bb && bb.lines) { const t = document.createElement('h3'); t.textContent = bb.boss + ' behavior'; const ul = document.createElement('ul'); bb.lines.forEach(x => ul.appendChild(li(x))); const note = document.createElement('div'); note.style.cssText = 'font-size:12px;color:var(--muted);margin:2px 0 6px'; note.textContent = 'Read from the game code, not tested in play.'; s.append(t, ul, note); } }
+  if (i.points && i.points[dep - 1] != null) { const p = document.createElement('div'); p.style.cssText = 'font-size:13px;margin-top:8px;color:var(--muted)'; p.textContent = i.points[dep - 1].toLocaleString() + ' points · ' + i.funds[dep - 1].toLocaleString() + ' funds'; s.appendChild(p); }
+  const lines = dep === 1 ? rw.d1 : rw.d2, RANK = { S: 'S rank', A: 'A rank', T: 'Treasure', 1: 'First place' };
+  const addChips = (title, arr) => { if (!arr.length) return; const t = document.createElement('h3'); t.textContent = title; const d = document.createElement('div'); d.className = 'dchips'; arr.forEach(x => d.appendChild(chip(x))); s.append(t, d); };
+  addChips('Rewards', lines.filter(x => /^[SA1T]:/.test(x)));
+  addChips('Pickups', lines.filter(x => !/^[SA1T]:/.test(x)));
+  if (!lines.length) { const p = document.createElement('p'); p.className = 'none'; p.textContent = 'None listed'; s.appendChild(p); }
+}
+Promise.all([fetch('campaign.json').then(r => r.json()), fetch('campaign_rewards.json').then(r => r.json()).catch(() => ({})), fetch('campaign_info.json').then(r => r.ok ? r.json() : {}).catch(() => ({})), fetch('campaign_links.json').then(r => r.ok ? r.json() : {}).catch(() => ({})), fetch('tree.json').then(r => r.json()).catch(() => ({ categories: [] }))]).then(([d, rw, inf, lk, tr]) => {
+  fetch('campaign_bosses.json').then(r => r.json()).then(b => { bosses = b; if (shown) showMission(shown); }).catch(() => {});
+  fetch('boss_behavior.json', { cache: 'no-cache' }).then(r => r.json()).then(b => { bossBehavior = b; if (shown) showMission(shown); }).catch(() => {});
+  fetch('classified.json').then(r => r.json()).then(cj => { cj.sections.forEach(s => s.items.forEach(it => { if (it.chip) labels[it.group + ':' + it.chip] = it.label || it.name; fulls[it.group + ':' + it.chip] = it.name; })); if (shown) showMission(shown); }).catch(() => {});
+  tr.categories.forEach(c => c.groups.forEach(g => g.chips.forEach(ch => { labels[g.name + ':' + ch.i] = ch.label; fulls[g.name + ':' + ch.i] = ch.full; })));
+  links = lk;
+  data = d; rewards = rw; info = inf; const bar = document.getElementById('bar'), btns = [];
+  const mk = (label, val) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'xo';
+    if (val) { const s = document.createElement('span'); s.className = 'dot'; s.style.background = COL[val]; b.appendChild(s); }
+    b.appendChild(document.createTextNode(label)); b.dataset.v = val || '';
+    b.onclick = () => { xo = val; btns.forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false')); draw(); if (shown) showMission(shown); };      // (showMission again: its Story link follows the chosen adjutant)
+    bar.appendChild(b); btns.push(b); b.setAttribute('aria-pressed', val === null ? 'true' : 'false'); };
+  mk('All routes', null); LANES.forEach(n => mk(n, n));
+  const sep0 = document.createElement('span'); sep0.style.cssText = 'width:16px'; bar.appendChild(sep0);
+  [['SPE', 'Special'], ['Inferno', 'Inferno']].forEach(([label, sec]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'xo'; b.textContent = label;
+    b.onclick = () => window.scrollTo({ top: document.getElementById('chart').getBoundingClientRect().top + scrollY + (secY[sec] || 0) - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sn-h')) || 0) - 8, behavior: 'smooth' }); bar.appendChild(b); });
+  const sep = document.createElement('span'); sep.style.cssText = 'width:16px'; bar.appendChild(sep);
+  const dbtn = [1, 2].map(n => { const b = document.createElement('button'); b.type = 'button'; b.className = 'xo'; b.textContent = 'Layout ' + n; b.setAttribute('aria-pressed', n === dep ? 'true' : 'false'); b.onclick = () => { dep = n; dbtn.forEach((x, k) => x.setAttribute('aria-pressed', k + 1 === n ? 'true' : 'false')); if (shown) showMission(shown); }; bar.appendChild(b); return b; });
+  // Inferno missions are not part of the campaign path (campaign_other.json): own buttons, panel shown with the same side panel
+  fetch('campaign_other.json').then(r => r.json()).then(o => { inferno = o.inferno || [];
+    const hh = decodeURIComponent(location.hash.slice(1)), ih = /^inferno-(\d)$/i.exec(hh), hk = ih ? ih[1] - 1 : inferno.findIndex(x => x.mission === hh);      // also accepts a bare HEL-A-7xx code from other pages
+    if (hk >= 0 && inferno[hk]) { picked = inferno[hk].name; showInferno(hk); }
+    draw(); }).catch(() => {});
+  const h = decodeURIComponent(location.hash.slice(1)), hn = /^\d{3}$/.test(h) ? h : null;      // #FAR-C-060 (the code) or #060 (the mission number, as the Story page links it; the tutorial 010-050 has no row in campaign.json)
+  const ts = hn && tutStages.find(s => s.game_code && s.game_code.slice(-3) === hn), hm = data.missions.find(m => m.code === h || (hn && m.code.slice(-3) === hn)) || (ts && { code: ts.game_code, region: 'Tutorial', xos: LANES, title: ts.title, gray: true });
+  if (hm) { picked = hm.code; showMission(hm); }
+  draw();
+  if (hm) { const n = [...document.querySelectorAll('g.node')].find(g => g.textContent === hm.code); if (n) n.scrollIntoView({ block: 'center' }); }
+});
+</script></body></html>
+
+
