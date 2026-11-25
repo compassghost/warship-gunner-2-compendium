@@ -1317,7 +1317,7 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
       if (saveTab === 'save') {
         for (var i = 0; i < 6; i++) {
           var e = a[i];
-          h += '<div class="sv' + (e ? '' : ' empty') + '"><span class="no">' + (i + 1) + '</span><span>' + (e ? info(e) : '- empty -') + '</span><span><button data-a="save" data-i="' + i + '">Save here</button>' + (e ? '<button data-a="del" data-i="' + i + '">Delete</button>' : '') + '</span></div>';
+          h += '<div class="sv' + (e ? '' : ' empty') + '"><span class="no">' + (i + 1) + '</span><span>' + (e ? info(e) : '- empty -') + '</span><span><button data-a="save" data-i="' + i + '">' + (e ? 'Overwrite' : 'Save') + '</button>' + (e ? '<button data-a="del" data-i="' + i + '">Delete</button>' : '') + '</span></div>';
         }
         h += '<div class="ld"><div class="row2"><button id="cpLink">Generate Link</button><button id="cpCode">Generate Code</button></div></div>';
       } else {
