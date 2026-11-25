@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Story - Warship Gunner 2 Compendium</title>
+<title>Warship Gunner 2 Compendium</title>
 <style>
   :root { --bg: #0d1421; --panel: #152033; --line: #2a3a55; --text: #dbe6f5; --muted: #8aa0bd; --accent: #5cc8ff; --box: #101a2c; --boxline: #34507a; --port: 96px; --w: #f2b84b; --t: #5ad19a; --b: #ff7a7a; }      /* --w / --t / --b: the adjutant colours of the Missions page (Werner, Tsukuba, Braun) */
   @media (prefers-color-scheme: light) {
@@ -230,7 +230,7 @@
     if (!n) out.appendChild(el('p', 'meta', 'No story text in this mission for this transcript.'));
     out.appendChild(nav2);
     Array.prototype.forEach.call($('list').querySelectorAll('button'), function (b) { b.setAttribute('aria-current', String(b.dataset.num === String(m.num))); });
-    $('pick').value = String(m.num); document.title = pad(m.num) + ' ' + m.title + ' - Story - Warship Gunner 2 Compendium';
+    $('pick').value = String(m.num); document.title = 'Warship Gunner 2 Compendium';
     var cur = $('list').querySelector('[aria-current=true]'); if (cur) cur.scrollIntoView({ block: 'nearest' });
   }
   function go(m) { history.replaceState(null, '', '#' + T.id + '/' + pad(m.num)); show(m); window.scrollTo(0, 0); }
