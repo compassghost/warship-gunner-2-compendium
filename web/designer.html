@@ -46,7 +46,7 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
 #wtTag .kv{min-width:230px;gap:0 14px;margin-top:4px;font-size:12.5px;line-height:1.35}#wtTag .kv b{color:#fff;font-weight:400}#wtTag .kv span{color:#fff}#wtTag .ghost{display:none}#wtTag .kv .over{color:var(--bad)}
 /* typewriter look for the text laid over the blueprint: system typewriter / monospace faces with a slightly heavy, inked stroke */
 #hullTag,#wtTag,#mode,#vpLabel{font-family:"Courier New","Courier Prime","American Typewriter",Courier,"Nimbus Mono PS","Liberation Mono",monospace;font-weight:700;text-shadow:0 0 1px currentColor,0 0 5px #2a394f}
-#hullTag{font-style:normal}#hName{pointer-events:auto;cursor:text;text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:1px}#hName input{font:inherit;letter-spacing:inherit;color:inherit;background:#0a1730;border:1px solid #4a6a9a;border-radius:3px;padding:0 4px;width:16em;outline:none}#wtTag b{color:#fff;font-weight:400}#wtTag .over{color:var(--bad)}
+#hullTag{font-style:normal;flex-direction:column;align-items:flex-start;gap:2px}#hHull{font-size:13px;font-weight:400;color:#c9d6ea}#hHull:empty{display:none}#hName{pointer-events:auto;cursor:text;text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:1px}#hName input{font:inherit;letter-spacing:inherit;color:inherit;background:#0a1730;border:1px solid #4a6a9a;border-radius:3px;padding:0 4px;width:16em;outline:none}#wtTag b{color:#fff;font-weight:400}#wtTag .over{color:var(--bad)}
 .armrow{display:flex;justify-content:flex-end;align-items:center;gap:8px}.armrow select{padding:1px 6px;font-size:inherit}
 .sum{position:relative;min-width:0;border-left:1px solid #1f3560}.sum .in{position:absolute;left:12px;right:10px;top:8px;bottom:6px;overflow:auto;font-size:12.5px;line-height:1.3}
 .sum h4{margin:0 0 4px;font-weight:500;letter-spacing:.1em;color:var(--accent);font-size:13px;display:flex;justify-content:space-between}.sum h4 small{color:var(--dim);font-size:12px}
@@ -91,7 +91,7 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
 @media (max-width:1100px){#airp .two2{grid-template-columns:minmax(340px,54%) 1fr}#airp .tabs2{grid-column:2}#airp .pv{display:none}}#airp .lp .r{grid-template-columns:56px 1fr auto}#airp .lp .r .n{white-space:nowrap}
 .ovl .lp .r{grid-template-columns:50px 1fr auto;padding:3px 8px}.ovl .lp .r .e{display:none}
 .ovl .lp .hd{margin:8px 0 2px;color:var(--dim);font-size:12px;letter-spacing:.1em;display:flex;justify-content:space-between}.ovl .lp .hd b{color:var(--accent);font-weight:500}.ovl .lp .hd .full{color:#ffa53d}
-.ovl .lp .r.rep{outline:2px solid #ff9a3d;outline-offset:-2px;background:rgba(255,154,61,.16)}.ovl .lp .r.rep .n + .n::after{content:'WILL BE REPLACED';color:#ffb866;font-size:11px;letter-spacing:.08em;margin-left:8px}
+.ovl .lp .r.rep,.ovl .lp .r.sel.rep{outline:2px solid #ff9a3d;outline-offset:-2px;background:#4a3320!important;color:#fff}.ovl .lp .r.rep .n + .n::after{content:'WILL BE REPLACED';color:#ffb866;font-size:11px;letter-spacing:.08em;margin-left:8px}
 .ovl .lp .r .cnt{display:flex;align-items:center;gap:3px;white-space:nowrap}.ovl .lp .r .cnt button{padding:0 7px;margin:0;line-height:1.5;font-size:13px;min-width:24px}
 #list{overflow:auto;padding:0 8px 12px;flex:1}
 .item{display:flex;justify-content:space-between;gap:8px;padding:5px 8px;border-radius:4px;cursor:pointer}
@@ -114,8 +114,8 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
 #hullp h3,#hullp .tabs2,#hullp .hint,#bluep h3,#bluep .tabs2{flex:none}#hullp .lst,#bluep .lst{flex:1 1 auto;min-height:80px;max-height:none}
 #hullp .it.sel{background:linear-gradient(90deg,#6f9a1e,#4d7415);color:#fff}#hullp .hint{color:var(--dim);font-size:12px;margin:6px 0 2px}
 #partsMenu{display:none;position:fixed;z-index:30;gap:6px;padding:6px;background:#0a1730;border:1px solid #4a6a9a;border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.5)}#partsMenu.open{display:flex;flex-wrap:wrap;max-width:min(560px,96vw)}#btnParts.on{background:#1b3563}
-#evalp{width:62%;min-width:560px}#evalp .ev{display:grid;grid-template-columns:minmax(220px,1fr) minmax(240px,1fr);gap:18px;align-items:center}#evalp .evr{display:grid;grid-template-columns:1fr 40px;align-items:center;padding:7px 4px;letter-spacing:.14em;font-size:15px;color:#7fb6ff}#evalp .evr.tot{margin-top:10px;color:#9fd0ff;font-size:17px}#evalp .ev>div:first-child{max-width:340px}#evalp .evr{position:relative;cursor:default}#evalp .evr:hover{background:rgba(31,74,134,.35);border-radius:4px}#evalp .evr .tp{display:none;position:absolute;left:0;top:100%;z-index:6;width:340px;padding:8px 10px;background:#0a1730;border:1px solid #4a6a9a;border-radius:6px;font-size:12.5px;line-height:1.45;letter-spacing:.02em;color:#c9d6ea;box-shadow:0 6px 16px rgba(0,0,0,.5)}#evalp .evr:hover .tp{display:block}#evalp .gr{display:grid;place-items:center;width:32px;height:32px;padding:0 0 1px;line-height:1;text-align:center;border-radius:50%;font-size:17px;font-weight:700;color:#0a1730;background:#7f93b3;justify-self:end}#evalp .gr.A{background:#e8eefc}#evalp .gr.B{background:#8fb8ff}#evalp .gr.C{background:#7f93b3;color:#e8f0ff}#evalp .gr.D{background:#566680;color:#cdd8ec}#evalp .gr.E{background:#3c4860;color:#9fb0cc}#evalp .gr.S{background:#ffd24d}#evalp .why{color:var(--dim);font-size:12px;letter-spacing:.04em;margin-top:10px;line-height:1.5}
-@media (max-width:900px){#evalp{width:96%;min-width:0}#evalp .ev{grid-template-columns:1fr}}
+#evalp{width:62%;min-width:560px;left:50%;transform:translateX(-50%)}#evalp .ev{display:grid;grid-template-columns:minmax(220px,340px) minmax(240px,340px);gap:36px;justify-content:center;align-items:center}#evalp .evr{display:grid;grid-template-columns:1fr 40px;align-items:center;padding:7px 4px;letter-spacing:.14em;font-size:15px;color:#7fb6ff}#evalp .evr.tot{margin-top:10px;color:#9fd0ff;font-size:17px}#evalp .ev>div:first-child{max-width:340px}#evalp .evr{position:relative;cursor:default}#evalp .evr:hover{background:rgba(31,74,134,.35);border-radius:4px}#evalp .evr .tp{display:none;position:absolute;left:0;top:100%;z-index:6;width:340px;padding:8px 10px;background:#0a1730;border:1px solid #4a6a9a;border-radius:6px;font-size:12.5px;line-height:1.45;letter-spacing:.02em;color:#c9d6ea;box-shadow:0 6px 16px rgba(0,0,0,.5)}#evalp .evr:hover .tp{display:block}#evalp .gr{display:grid;place-items:center;width:32px;height:32px;padding:0 0 2px;line-height:1;text-align:center;border-radius:50%;font-size:17px;font-weight:700;color:#0a1730;background:#7f93b3;justify-self:end}#evalp .gr.A{background:#e8eefc}#evalp .gr.B{background:#8fb8ff}#evalp .gr.C{background:#7f93b3;color:#e8f0ff}#evalp .gr.D{background:#566680;color:#cdd8ec}#evalp .gr.E{background:#3c4860;color:#9fb0cc}#evalp .gr.S{background:#ffd24d}#evalp .why{color:var(--dim);font-size:12px;letter-spacing:.04em;margin-top:10px;line-height:1.5}
+@media (max-width:900px){#evalp{width:96%;min-width:0}#evalp .ev{grid-template-columns:1fr;gap:12px}}
 #bluep .it.sel{background:linear-gradient(90deg,#6f9a1e,#4d7415);color:#fff}#bluep .it.sel small{color:#dfe9c8}#bluep .kinds{margin:6px 0 0}
 </style></head><body><script src="nav.js"></script>
 <div id="app">
@@ -128,7 +128,7 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
   <button id="btnParts" title="Weapons, Engine, Structures, Systems, Aircraft">Parts &#9662;</button>
   <div id="partsMenu">
   <button id="btnWpn" title="The weapons list: 7 slots (WPN 1-7); weapons are assigned by slot and placed from it">Weapons</button>
-  <button id="btnEngine" title="Engine: power source, propulsion, smokestacks">Engine</button>
+  <button id="btnEngine" title="Engine: power source, propulsion, purge (smokestacks)">Engine</button>
   <button id="btnStruct" title="Structures: forward / aft bridge, searchlights, launchers, heliports, containers, elevators, catapults">Structures</button>
   <button id="btnSys" title="The 10 system slots (SYS 1-10)">Systems</button>
   <button id="btnAir" title="Aircraft (carriers, and ships with a launcher or heliport)">Aircraft</button>
@@ -140,7 +140,7 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
   <button id="btn3d" title="Open this build as a 3D model in a new tab">Open in 3D</button>
   <button id="btnCtl">Controls</button>
 </header>
-<div id="stage"><canvas id="cv" width="640" height="410"></canvas><div id="mode">EDITING PART</div><div id="hullTag"><span id="hName" title="Click to name this ship">-</span></div><div id="wtTag"><div id="wtRow"></div><div class="kv" id="kv2"></div></div><div id="vpLabel"></div>
+<div id="stage"><canvas id="cv" width="640" height="410"></canvas><div id="mode">EDITING PART</div><div id="hullTag"><span id="hName" title="Click to name this ship">-</span><span id="hHull"></span></div><div id="wtTag"><div id="wtRow"></div><div class="kv" id="kv2"></div></div><div id="vpLabel"></div>
   <div id="wpn"><h3>WEAPONS</h3><div id="wpnRows"></div><div class="foot" id="wpnClear">REMOVE ALL WEAPONS</div></div>
   <div id="pick"><span class="x" id="pickX">&times;</span>
     <div class="col" id="pType"><h4>TYPE</h4></div><div class="col" id="pGroup"><h4>CALIBER / WEAPON</h4></div><div class="det" id="pDet"></div></div>
@@ -176,13 +176,13 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
   </div>
   <div id="menu" class="ovl two"><h3><span id="menuT">PARTS</span><span class="x" id="menuX">&times;</span></h3><div class="two2"><div class="lp" id="menuL"></div><div class="tabs2" id="tabs"></div><div class="lst" id="list"></div><div class="pv" id="menuPv"></div></div><div class="foot"><span id="menuRm"></span><span id="menuHint"></span></div></div>
 </div>
+<div id="note"></div>
 <div id="hud">
   <div id="armorBar"><b id="armLbl">ARMOR RATING</b><span class="armrow" id="armVal"><select id="armorSel" title="Armor plating size"></select><span id="armTxt"></span></span></div>
   <div class="sum" id="sumW"><div class="in"></div></div>
   <div class="sum" id="sumS"><div class="in"></div></div>
   <div class="sum" id="sumA" style="display:none"><div class="in"></div></div>
 </div>
-<div id="note"></div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -198,7 +198,7 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
   var SPEEDS = [1, 3, 6], undo = [], palette = {}, DEF = {}, DEFB = {}, UST = {}, KST = {}, FAM = ['forward bridge', 'aft bridge', 'smokestack', 'facility', 'power source', 'propulsion'],
     menuKind = 'struct', FACK = { 14: 'elevator', 15: 'launcher', 16: 'searchlight', 17: 'heliport', 18: 'catapult', 19: 'container' },      // facility part kinds -> the game's own rows (DAT 15 text 374-386)
     FACL = { 14: function (p) { return p.label === 'side elevator' ? 'Side Elevator' : 'Elevator'; }, 17: function (p) { return p.weight >= 1000 ? 'Large Heliport' : 'Heliport'; }, 18: function () { return 'Catapult'; }, 19: function () { return 'Ammunition Depot'; } },
-    TABNAME = { 'forward bridge': 'FWD BRIDGE', 'aft bridge': 'AFT BRIDGE', searchlight: 'SEARCHLIGHTS', launcher: 'LAUNCHERS', heliport: 'HELIPORTS', container: 'CONTAINERS', elevator: 'ELEVATORS', catapult: 'CATAPULTS', 'power source': 'POWER SOURCE', propulsion: 'PROPULSION', smokestack: 'SMOKESTACKS' },
+    TABNAME = { 'forward bridge': 'FWD BRIDGE', 'aft bridge': 'AFT BRIDGE', searchlight: 'SEARCHLIGHTS', launcher: 'LAUNCHERS', heliport: 'HELIPORTS', container: 'CONTAINERS', elevator: 'ELEVATORS', catapult: 'CATAPULTS', 'power source': 'POWER SOURCE', propulsion: 'PROPULSION', smokestack: 'PURGE' },
     MENUS = { struct: { title: 'STRUCTURES', tabs: ['forward bridge', 'aft bridge', 'searchlight', 'launcher', 'heliport', 'container', 'elevator', 'catapult'], fam: ['forward bridge', 'aft bridge', 'facility'], rm: 'REMOVE ALL STRUCTURES', msg: 'Removing all structures.' },
               engine: { title: 'ENGINE', tabs: ['power source', 'propulsion', 'smokestack'], fam: ['smokestack', 'boiler', 'engine part'], rm: 'REMOVE ALL ENGINE PARTS', msg: 'Removing all engine parts.' } };      // the parts menu: structures, funnels, facilities and engines; weapons are assigned in the weapons list
   var SINGLE = function (p, id) { return p.family === 'missile' || (id >= 1114 && id <= 1120) || (id >= 1028 && id <= 1041) || id === 19203; };      // single off-centre parts seen in the game's designs (VLS, carrier side AA, side hi-angle guns)
@@ -395,7 +395,7 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
     $('evX').onclick = function () { p.classList.remove('open'); };
   }
   // ---------- drawing ----------
-  function tintOf(m, st) { var cat = m[4] & 255; return st === 'dim' ? '#8497b3' : st === 'sel' ? '#ffe45c' : st === 'ok' ? '#7ddc2f' : st === 'orig' ? '#3f8cff' : st === 'bad' ? '#ff5a5a' : cat === 10 ? '#e0a020' : cat === 11 ? '#5fe3ff' : null; }
+  function tintOf(m, st) { var cat = m[4] & 255; return st === 'dim' ? '#8497b3' : st === 'sel' ? '#ffe45c' : st === 'ok' ? '#7ddc2f' : st === 'orig' ? '#3f8cff' : st === 'bad' ? '#ff5a5a' : cat === 10 ? (state.shotWhite ? '#ffffff' : '#e0a020') : cat === 11 ? (state.shotWhite ? '#ffffff' : '#5fe3ff') : null; }      // (in the screenshot the engines and turbines are white like the rest of the blueprint)
   var SIDE_NUDGE = {};      // the catapult's side picture sits one pixel low: its two lines merge with the hull's deck line into a filled bar (user: raise it 1 px)
   function drawMount(m, st, alpha) {
     var g = geo(m); if (!g) return; var col = tintOf(m, st); ctx.globalAlpha = alpha || 1;
@@ -432,6 +432,7 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
   function hud() {
     var Hh = D.hulls[state.hull], S = stats(), cls = /Battlecarrier/.test(Hh.name) ? 'BC' : /Battleship/.test(Hh.name) ? 'BB' : /Cruiser/.test(Hh.name) ? 'CA' : /Carrier/.test(Hh.name) ? 'CV' : /Destroyer/.test(Hh.name) ? 'DD' : /Sub/.test(Hh.name) ? 'SS' : /Frigate/.test(Hh.name) ? (state.hull === 700 ? 'DD' : 'FF') : ({ 13: 'DD', 14: 'CA', 15: 'BB', 16: 'CV', 17: 'BC', 18: 'SS', 19: 'FF' }[Hh.hclass] || '--');      // (names like "Supercarrier" / "Shark Submarine" / "Duckship" fall back to the hull class byte)      // hull 700 is "Jpn Frigate I" with the DD tag in the game
     if (!$('hName').querySelector('input')) $('hName').textContent = state.name || Hh.name;      // the ship's own name (click to edit), else the hull's
+    $('hHull').textContent = state.name ? Hh.name : '';      // with a custom name the hull is listed underneath
     var np = state.mounts.length, V = vp(), X = extra(), armTip;
     try { if (!rankData()) { $('btnEval').textContent = 'Stats'; if ($('evalp').classList.contains('open')) renderEval(); } else { var RK = rank(); $('btnEval').textContent = 'Stats ' + RK.letter; if ($('evalp').classList.contains('open')) renderEval(); } } catch (er) { }      // the button carries the overall rank; the open panel follows the design
     (function () {      // the tooltip of ARMOR RATING: the game's armor weight formula with this design's numbers (decoded, 530 / 530 stock designs)
@@ -460,8 +461,10 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
     var sAi = $('sumA').firstChild; if (sAi.innerHTML !== ah) sAi.innerHTML = ah; $('sumA').style.display = nAir ? '' : 'none'; $('hud').classList.toggle('air', !!nAir);
     $('kv2').innerHTML = wtHtml + '<b>PARTS MAX</b><span class="' + (np > 100 ? 'over' : '') + '">' + np + '/100</span>' + (function () { var ne = state.mounts.filter(function (m) { return m[9]; }).length; return '<b class="' + (ne ? 'over' : 'ghost') + '">PARTS IN ERROR</b><span class="' + (ne ? 'over' : 'ghost') + '" title="Red parts cannot leave the dock: move them to a legal place or delete them">' + ne + '</span>'; })() +      /* always laid out (hidden when 0): a row that comes and goes made the HUD, and with it the canvas, change size */ '<b>ENDURANCE</b><span title="hull endurance + the systems\' endurance (at least 100)">' + X.endurance + '</span><b>COMMAND</b><span title="bridge command + systems (+ the systems\' command % of the bridge value); with radar and sonar it sets the command rank">' + X.command + '</span><b>RADAR / SONAR</b><span>' + X.radar + ' / ' + X.sonar + '</span><b>STEERING</b><span>' + X.steering + '</span>' + '<b class="' + (X.unvented ? 'over' : 'ghost') + '">UNVENTED BOILERS</b><span class="' + (X.unvented ? 'over' : 'ghost') + '" title="Boilers need smokestacks (purge): the design cannot leave the dock like this">' + X.unvented + '</span>' + '<b>SPEED</b><span title="engine output x efficiency / weight through the game\'s speed curve; max 64.6 kt before systems">' + (S.speed ? S.speed.toFixed(1) + 'kt' : '-') + '</span>';
     var s = state.sel >= 0 && state.mounts[state.sel], note = state.msg;
-    if (!note) { if (s) { var p = D.parts[s[0]]; note = 'Selected: ' + p.label + (barrelsOf(s) > 1 ? ' x' + barrelsOf(s) : '') + ' - ' + (p.wb4 ? p.wb4[Math.min(5, barrelsOf(s) - 1)] : '?') + 't - x ' + s[1] + ', y ' + s[3] + ', level ' + s[2] + (s[9] ? ' - IN ERROR: ' + (ERR[check(s, [state.sel, partnerOf(state.sel)])] || 'overlapping or outside its allowed area') : ''); }      /* a part in error says why when it is selected */
-      else if (state.tool) note = 'Placing: ' + D.parts[state.tool[0]].label + (barrelsOf(state.tool) > 1 ? ' x' + barrelsOf(state.tool) : '') + (state.err ? ' - ' + ERR[state.err] : '');
+    var under = !s && !state.tool && state.held < 0 && !state.hideCur ? hit(state.cur.col, state.cur.row) : -1, us = under >= 0 && state.mounts[under];      // the part under the cursor (when nothing is selected or being placed)
+    if (!note) { if (us) note = 'Cursor: ' + labelOf(us[0]) + (barrelsOf(us) > 1 ? ' x' + barrelsOf(us) : '') + (us[9] ? ' - IN ERROR' : '');
+      else if (s) { var p = D.parts[s[0]]; note = 'Selected: ' + labelOf(s[0]) + (barrelsOf(s) > 1 ? ' x' + barrelsOf(s) : '') + (s[9] ? ' - IN ERROR: ' + (ERR[check(s, [state.sel, partnerOf(state.sel)])] || 'overlapping or outside its allowed area') : ''); }      /* a part in error says why when it is selected */
+      else if (state.tool) note = 'Placing: ' + labelOf(state.tool[0]) + (barrelsOf(state.tool) > 1 ? ' x' + barrelsOf(state.tool) : '') + (state.err ? ' - ' + ERR[state.err] : '');
       else note = ''; }      /* nothing to say: the idle "Cursor (x, y) - pick a part from Menu ..." hint is gone (the line keeps its height, so the layout does not jump when a message appears) */
     $('note').textContent = note;
     $('mode').textContent = state.held >= 0 ? 'MOVING PART' : state.tool ? 'PLACING PART' : 'EDITING PART';
@@ -661,7 +664,7 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
     if (g >= 200 && g <= 203) return 'Boiler ' + s;
     var EN = { 204: 'Nuclear Reactor ', 205: 'Fusion Reactor ', 206: 'Gas Turbine ', 207: 'Sub Boiler ', 208: 'Sub Nuclear Reactor ', 210: 'DD Steam Turbine ', 211: 'Steam Turbine ', 212: 'Sub Turbine ' };
     if (EN[g]) return EN[g] + (g === 205 || g === 207 || g === 212 ? k + 1 : (g === 208 ? ['1', '2', '3', '4', 'α'][k] : s));
-    var l = p.label.replace('U.S.', 'US').replace('U.K.', 'UK').replace(/ \(weight \d+\)/, '').replace(/ \(mount variant \w\)/, '').replace(/level (\d+)/, function (a, n) { return ROM[+n] || n; });
+    var l = p.label.replace('smokestack', 'Smokestack').replace('U.S.', 'US').replace('U.K.', 'UK').replace(/ \(weight \d+\)/, '').replace(/ \(mount variant \w\)/, '').replace(/level (\d+)/, function (a, n) { return ROM[+n] || n; });
     return l.charAt(0) === l.charAt(0).toLowerCase() ? l.charAt(0).toUpperCase() + l.slice(1) : l;
   }
   function labelOf(id) { var p = D.parts[id]; return p.family === 'facility' && FACL[p.kind] ? FACL[p.kind](p) : partName(id, p); }
@@ -715,7 +718,7 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
       var p = D.parts[e.id]; if (!(p.hcls & mask)) return;
       var d = document.createElement('div'), full = capNow !== null && countTab(state.family) >= capNow, hasId = function (id) { return state.mounts.some(function (m) { return m[0] === id; }); }, exclusive = (e.id === 19000 && hasId(19001)) || (e.id === 19001 && hasId(19000));      // an elevator and a side elevator cannot be mixed (user)
       if (exclusive) full = true; d.className = 'item' + (state.tool && state.tool[0] === e.id ? ' sel' : '') + (full ? ' off' : ''); if (full) d.title = exclusive ? 'Elevators and side elevators cannot be mixed' : 'Limit reached (' + capNow + ')';
-      var st = p.out ? ' <em>' + p.out + ' hp</em>' : p.eff ? ' <em>eff ' + p.eff + '</em>' : '';
+      var st = '';      // (output / efficiency are on the card at the right)
       d.innerHTML = '<span>' + e.label + st + '</span>';      // (the weight is on the card at the right)
       d.onclick = function () { if (full) return; pickEntry(e); };
       d.onmouseenter = function () { showPv(e); }; l.appendChild(d);
@@ -983,7 +986,7 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
     p.querySelectorAll('.it').forEach(function (it) {
       it.onclick = function () { if (it.classList.contains('off')) return; setSys(sysSel, +it.dataset.id); };
       it.addEventListener('mouseenter', function () { sysPvId = +it.dataset.id; showSysPv(sysPvId); });
-      it.onmouseenter = function () { if (it.classList.contains('off')) return; var j = sysRepl(sysSel, +it.dataset.id), r = j >= 0 && p.querySelector('.lp .r[data-i="' + j + '"]'); if (r) { r.classList.add('rep'); r.dataset.rep = '1'; } };      // hovering shows which fitted system this one would replace
+      it.onmouseenter = function () { if (it.classList.contains('off')) return; var j = sysTarget(sysSel, +it.dataset.id), r = j >= 0 && p.querySelector('.lp .r[data-i="' + j + '"]'); if (r) { r.classList.add('rep'); r.dataset.rep = '1'; } };      // hovering shows which fitted system this one would replace
       it.onmouseleave = function () { p.querySelectorAll('.lp .r.rep').forEach(function (r) { r.classList.remove('rep'); }); };
     });
     var first = p.querySelector('.it'); if (!sysPvId || !D.systems[sysPvId] || D.systems[sysPvId].group !== sysTab) sysPvId = first ? +first.dataset.id : 0; showSysPv(sysPvId);
@@ -993,7 +996,7 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
   function showSysPv(id) {      // the card beside the systems list: what the system does (its effects as rows) and the game's own description; no part picture
     var box = $('sysPv'), s = D.systems[id]; if (!box || !s) { if (box) box.innerHTML = ''; return; }
     var rows = []; sysEffect(id).split(', ').forEach(function (e) { var m = /^(.*?) ([+-][\d.]+%?)$/.exec(e); rows.push(m ? [m[1], m[2]] : [e, '']); });
-    rows.push(['WEIGHT', s.w + 't']); var rp = sysRepl(sysSel, id);
+    rows.push(['WEIGHT', s.w + 't']); var rp = sysTarget(sysSel, id);
     box.innerHTML = '<div class="t">' + s.name + '</div><div class="kv">' + rows.filter(function (r) { return r[0]; }).map(function (r) { return r[1] ? '<b>' + r[0] + '</b><span>' + r[1] + '</span>' : '<span style="grid-column:1/3">' + r[0] + '</span>'; }).join('') + '</div>' + (s.desc ? '<div class="ds">' + s.desc + '</div>' : '') + (s.note ? '<div class="nt">' + s.note + '</div>' : '') + (rp >= 0 && D.systems[state.sys[rp]] ? '<div class="nt" style="color:#ffb866">Replaces ' + D.systems[state.sys[rp]].name + '.</div>' : '');
   }
   function sysTok(s) { var w = s.pc || s.ef, t = {}; if (w[14] & 255) t.fwd = 1; if ((w[14] >> 8) & 255) t.bwd = 1; if (w[15] & 255) t.jet = 1; if (w[17] & 8) t.bow = 1; return t; }      // thruster functions in a record: forward / backward (word 14), bow jet (word 15), bow thrusters (bit 8 of word 17)
@@ -1012,6 +1015,7 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
   function sysRepl(i, id) {      // the slot whose system the new one would replace (-1 = none)
     var s = D.systems[id]; for (var j = 0; j < 10; j++) if (j !== i && state.sys[j] >= 0 && ((s.mask && (D.systems[state.sys[j]].mask & s.mask)) || Object.keys(sysTok(s)).some(function (k) { return sysTok(D.systems[state.sys[j]])[k]; }))) return j; return -1;
   }
+  function sysTarget(i, id) { var j = sysRepl(i, id); return j >= 0 ? j : (i >= 0 && state.sys[i] >= 0 ? i : -1); }      // the system that gets replaced: the one of the same family elsewhere, else whatever sits in the selected slot
   function setSys(i, id) {      // a system replaces one of the same family (the game: "X has been replaced with Y")
     var s = D.systems[id], msg = '', why = sysBlock(id, i); if (why) { state.msg = why; draw(); renderSys(); return; }
     for (var j = 0; j < 10; j++) if (j !== i && state.sys[j] >= 0 && ((s.mask && (D.systems[state.sys[j]].mask & s.mask)) || Object.keys(sysTok(s)).some(function (k) { return sysTok(D.systems[state.sys[j]])[k]; }))) {      /* systems of one family share a mask bit and replace each other; mask 0 combines freely (notes/designer_code.md 13) */ pushUndo(); msg = D.systems[state.sys[j]].name + ' has been replaced with ' + s.name + '.'; state.sys[j] = id; state.msg = msg; draw(); renderSys(); return; }
@@ -1200,7 +1204,7 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
     var cw = Math.max(320, Math.min(app.clientWidth, Math.floor((app.clientHeight - h) * 640 / 410)));      // the canvas (640 x 410 aspect); the blueprint viewport around it is wider on both sides
     for (var it = 0; it < 4; it++) {      // everything below must fit: if the page content is still taller than the window (fonts, zoom), shrink the canvas by the overflow
       $('cv').style.width = cw + 'px'; st.style.width = Math.min(app.clientWidth, Math.floor(cw * 1.3)) + 'px';
-      var over = Math.ceil($('note').getBoundingClientRect().bottom - app.getBoundingClientRect().top - app.clientHeight); if (over <= 0 || cw <= 320) break;      // (measured at the note line, the last element: open panels float over the canvas and must not count) cw = Math.max(320, cw - Math.ceil(over * 640 / 410));
+      var over = Math.ceil($('hud').getBoundingClientRect().bottom - app.getBoundingClientRect().top - app.clientHeight); if (over <= 0 || cw <= 320) break;      // (measured at the note line, the last element: open panels float over the canvas and must not count) cw = Math.max(320, cw - Math.ceil(over * 640 / 410));
     }
     var cb = $('cv').getBoundingClientRect(), b = st.getBoundingClientRect(), k = cb.width / 640, de = document.documentElement.style;      // the blueprint grid continues beyond the canvas to the window edges, with the same 8-pixel cell and the canvas' own grid lines
     de.setProperty('--gs', (8 * k) + 'px'); de.setProperty('--gx', cb.left + 'px'); de.setProperty('--gy', (cb.top + (TOP % 8) * k) + 'px');
@@ -1220,37 +1224,33 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
     var as = $('armorSel'); D.armorSize.forEach(function (cm, i) { var o = document.createElement('option'); o.value = i; o.textContent = cm ? cm + 'cm' : 'None'; as.appendChild(o); });
     ds.onchange = function () { setDesign(+ds.value); }; hs.onchange = function () { setHullKeep(+hs.value); draw(); }; as.onchange = function () { state.armorIdx = +as.value; draw(); };
     // ---------- blueprint picker: ship class -> hull -> Anti-Ship / Anti-Air / Anti-Sub (the 435 stock designs; the 95 secret blueprints are not offered here) ----------
-    var BCLS = ['DD', 'CA', 'BB', 'BC', 'CV', 'SS', 'FF', 'BP'], CODE = { 13: 'DD', 14: 'CA', 15: 'BB', 16: 'CV', 17: 'BC', 18: 'SS', 19: 'FF' }, KIND = ['Anti-Ship', 'Anti-Air', 'Anti-Sub'], blueCls = 'BB', blueHull = -1, blueMode = 'bp';
+    var BCLS = ['DD', 'CA', 'BB', 'BC', 'CV', 'SS', 'FF', 'BP'], CODE = { 13: 'DD', 14: 'CA', 15: 'BB', 16: 'CV', 17: 'BC', 18: 'SS', 19: 'FF' }, KIND = ['Anti-Ship', 'Anti-Air', 'Anti-Sub'], blueCls = 'BB', blueHull = -1, blueMode = 'hull';
     function clsOf(h) { return /Frigate/.test(h.name) && h.id !== 700 ? 'FF' : CODE[h.hclass] || 'DD'; }      // hull 700 ("Jpn Frigate I") carries the DD tag in the game
     function variants(hid) { var seen = {}, out = []; D.designs.forEach(function (d) { if (d.n < 435 && d.hull === hid) { var k = JSON.stringify(d.mounts); if (!seen[k]) { seen[k] = 1; out.push(d); } } }); return out; }      // a set the game does not really have (identical to an earlier one) is not offered twice
     window.blueLabel = function () { $('btnBlue').textContent = 'Blueprints'; };      // the button always just says Blueprints (user request)
-    function renderBlue() {
-      var p = $('bluep'), cur = D.designs[+$('design').value];
-      var h = '<h3><span>BLUEPRINTS</span><span class="x" id="blueX">&times;</span></h3><div class="tabs2">' + BCLS.map(function (c) { return '<button data-c="' + c + '" class="' + (c === blueCls ? 'on' : '') + '">' + c + '</button>'; }).join('') + '</div>';
-      if (blueCls === 'BP') {      // the 95 secret blueprints (designs 435-529): the real ships and fictional designs, by name
-        p.innerHTML = h + '<div class="lst">' + D.designs.filter(function (d) { return d.n >= 435; }).map(function (d) { return '<div class="it' + (cur && cur.n === d.n ? ' sel' : '') + '" data-n="' + d.n + '"><span>' + d.name + '</span><small>' + shortHull(D.hulls[d.hull].name) + '</small></div>'; }).join('') + '</div><div class="tabs2 kinds">' + KIND.map(function (k) { return '<button class="dis" disabled>' + k + '</button>'; }).join('') + '<button data-swap="1" title="Swap the hull of the design you are editing: your parts stay, the ones that do not fit are marked as errors">Hull Swap</button></div>';
-        p.querySelector('button[data-swap]').onclick = function () { blueMode = 'swap'; blueCls = clsOf(D.hulls[state.hull]); renderBlue(); };
-        $('blueX').onclick = function () { p.classList.remove('open'); };
-        p.querySelectorAll('.tabs2 button[data-c]').forEach(function (b) { b.onclick = function () { blueCls = b.dataset.c; blueHull = -1; renderBlue(); }; });
-        p.querySelectorAll('.it').forEach(function (it) { it.onclick = function () { setDesign(+it.dataset.n); closeOvl(); }; });
-        var sl = p.querySelector('.it.sel'); if (sl && sl.scrollIntoView) sl.scrollIntoView({ block: 'nearest' }); return;
+    function renderBlue() {      // Hull (default): the list is every hull of the class and a pick swaps the hull of the design being edited (parts stay; the ones that do not fit are moved or marked as errors).
+      // Anti-Ship / Anti-Air / Anti-Sub: the stock blueprints; a pick loads that blueprint and overwrites the whole design.
+      var p = $('bluep'), cur = D.designs[+$('design').value], hullMode = blueMode === 'hull', bp = blueCls === 'BP';
+      var h = '<h3><span>' + (hullMode || bp ? (bp ? 'BLUEPRINTS' : 'HULL') : 'BLUEPRINTS') + '</span><span class="x" id="blueX">&times;</span></h3><div class="tabs2">' + BCLS.map(function (c) { return '<button data-c="' + c + '" class="' + (c === blueCls ? 'on' : '') + '">' + c + '</button>'; }).join('') + '</div>';
+      if (bp) h += '<div class="lst">' + D.designs.filter(function (d) { return d.n >= 435; }).map(function (d) { return '<div class="it' + (cur && cur.n === d.n ? ' sel' : '') + '" data-n="' + d.n + '"><span>' + d.name + '</span><small>' + shortHull(D.hulls[d.hull].name) + '</small></div>'; }).join('') + '</div>';      // the 95 secret blueprints (designs 435-529): the real ships and fictional designs, by name
+      else {
+        var ids = Object.keys(D.hulls).map(Number).sort(function (x, y) { return x - y; }).filter(function (id) { return clsOf(D.hulls[id]) === blueCls && (hullMode || variants(id).some(function (x) { return x.n % 3 === blueMode; })); });
+        h += '<div class="lst">' + ids.map(function (id) { var on = hullMode ? id === state.hull : cur && cur.n < 435 && cur.hull === id && cur.n % 3 === blueMode; return '<div class="it' + (on ? ' sel' : '') + '" data-h="' + id + '"><span>' + shortHull(D.hulls[id].name) + '</span><small>' + D.hulls[id].mw + ' t</small></div>'; }).join('') + '</div>';
       }
-      var swap = blueMode === 'swap';      // Hull Swap: the list shows every hull of the class and a pick swaps the hull of the design being edited (parts stay; the ones that do not fit are marked as errors)
-      var ids = Object.keys(D.hulls).map(Number).sort(function (x, y) { return x - y; }).filter(function (id) { return clsOf(D.hulls[id]) === blueCls && (swap || variants(id).length); }), cur0 = swap ? state.hull : blueHull;
-      h = h.replace('<span>BLUEPRINTS</span>', '<span>' + (swap ? 'HULL SWAP' : 'BLUEPRINTS') + '</span>');
-      h += '<div class="lst">' + ids.map(function (id) { return '<div class="it' + (id === cur0 ? ' sel' : '') + '" data-h="' + id + '"><span>' + shortHull(D.hulls[id].name) + '</span><small>' + D.hulls[id].mw + ' t</small></div>'; }).join('') + '</div>';
-      var vs = !swap && blueHull >= 0 ? variants(blueHull) : [];
-      h += '<div class="tabs2 kinds">' + KIND.map(function (k, q) { var d = vs.filter(function (x) { return x.n % 3 === q; })[0]; return d ? '<button data-n="' + d.n + '"' + (cur && cur.n === d.n ? ' class="on"' : '') + '>' + k + '</button>' : '<button class="dis" disabled>' + k + '</button>'; }).join('') + '<button data-swap="1"' + (swap ? ' class="on"' : '') + ' title="Swap the hull of the design you are editing: your parts stay, the ones that do not fit are marked as errors">Hull Swap</button></div>';
-      if (swap) h += '<div class="hint">Keeps your parts; any that do not fit the new hull are moved to fit or marked as errors</div>';
+      h += '<div class="tabs2 kinds"><button data-k="hull"' + (hullMode && !bp ? ' class="on"' : '') + '>Hull</button>' + KIND.map(function (k, q) { return '<button data-k="' + q + '"' + (bp ? ' class="dis" disabled' : (blueMode === q ? ' class="on"' : '')) + '>' + k + '</button>'; }).join('') + '</div>';
       p.innerHTML = h; $('blueX').onclick = function () { p.classList.remove('open'); };
-      p.querySelectorAll('.tabs2 button[data-c]').forEach(function (b) { b.onclick = function () { blueCls = b.dataset.c; blueHull = -1; if (blueCls === 'BP') blueMode = 'bp'; renderBlue(); }; });
-      p.querySelectorAll('.it').forEach(function (it) { it.onclick = function () { if (swap) { newHull(+it.dataset.h); draw(); closeOvl(); return; } blueHull = +it.dataset.h; var vs = variants(blueHull); if (vs.length === 1) { setDesign(vs[0].n); closeOvl(); } else renderBlue(); }; });
-      p.querySelectorAll('button[data-n]').forEach(function (b) { b.onclick = function () { setDesign(+b.dataset.n); closeOvl(); }; });
-      p.querySelector('button[data-swap]').onclick = function () { blueMode = swap ? 'bp' : 'swap'; if (blueMode === 'swap') blueCls = clsOf(D.hulls[state.hull]); renderBlue(); };
+      p.querySelectorAll('.tabs2 button[data-c]').forEach(function (b) { b.onclick = function () { blueCls = b.dataset.c; renderBlue(); }; });
+      p.querySelectorAll('button[data-k]').forEach(function (b) { b.onclick = function () { blueMode = b.dataset.k === 'hull' ? 'hull' : +b.dataset.k; if (bp) blueCls = clsOf(D.hulls[state.hull]); renderBlue(); }; });
+      p.querySelectorAll('.it').forEach(function (it) {
+        it.onclick = function () {
+          if (it.dataset.n) { setDesign(+it.dataset.n); closeOvl(); return; }
+          var id = +it.dataset.h; if (hullMode) { newHull(id); draw(); closeOvl(); return; }
+          var d = variants(id).filter(function (x) { return x.n % 3 === blueMode; })[0]; if (d) { setDesign(d.n); closeOvl(); }
+        };
+      });
       var sel = p.querySelector('.it.sel'); if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest' });
     }
-    $('btnBlue').onclick = function () { blueMode = 'bp'; var d = D.designs[+$('design').value]; if (!$('bluep').classList.contains('open') && d) { if (d.n < 435) { blueCls = clsOf(D.hulls[d.hull]); blueHull = d.hull; } else { blueCls = 'BP'; blueHull = -1; } } toggleOvl('bluep', renderBlue); };
-    blueLabel(-1);
+    $('btnBlue').onclick = function () { blueMode = 'hull'; var d = D.designs[+$('design').value]; if (!$('bluep').classList.contains('open')) blueCls = d && d.n >= 435 ? 'BP' : clsOf(D.hulls[state.hull]); toggleOvl('bluep', renderBlue); };    blueLabel(-1);
     // ---------- hull picker: ship class -> hull; the pick starts an EMPTY design on that hull (no parts, systems, aircraft or armor kept) ----------
     var hullCls = 'BB';
     function renderHull() {
@@ -1268,11 +1268,24 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
       state.hull = id; var fitted = 0;
       if (id !== old) {      // every part that does not fit the new hull gets a best-fit search before it stays marked as an error (mirrored pairs are fitted together; the parts that fit first block the later ones)
         revalidate(); var seen = {};
-        state.mounts.forEach(function (m, i) { if (!m[9] || seen[i]) return; var j = partnerOf(i); seen[i] = 1; if (j >= 0) seen[j] = 1; if (fitPart(i, j)) fitted += j >= 0 ? 2 : 1; });
+        state.mounts.forEach(function (m, i) { if (!m[9] || seen[i]) return; var j = partnerOf(i); seen[i] = 1; if (j >= 0) seen[j] = 1; if (fitPart(i, j) || substPart(i, j)) fitted += j >= 0 ? 2 : 1; });
       }
       revalidate();
       var bad = state.mounts.filter(function (m) { return m[9]; }).length;
       state.msg = [fitted ? fitted + ' part' + (fitted > 1 ? 's' : '') + ' moved to fit the new hull' : '', bad ? bad + (bad > 1 ? ' parts still do not fit' : ' part still does not fit') + ' (marked red; Delete errors removes them)' : ''].filter(Boolean).join('; ');
+    }
+    function substPart(i, j) {      // a part the new hull class may not carry: swap in the closest legal variant of the same kind (same caliber/family first, nearest weight); false if there is none
+      var m = state.mounts[i], p = j >= 0 ? state.mounts[j] : null, g = geo(m); if (!g || check(m, [i, j]) !== 1 || /^(boiler|engine part|smokestack|forward bridge|aft bridge|facility|unknown)$/.test(g.p.family)) return false;      // (bridges, boilers, engines, smokestacks stay red on purpose)
+      var mask = HCMASK[D.hulls[state.hull].hclass] || 0, cur = g.p, key = function (q) { var s = (q.label || '').replace(/ \(.*$/, ''); var r = /^[\d.]+cm [A-Za-z.\- ]*?(?= \d|$)/.exec(s); return r ? r[0] : s.replace(/\s+[IVX\d\u03b1-\u03b9]+$/, ''); };
+      var ck = key(cur), cs = [];
+      Object.keys(D.parts).forEach(function (k) { var q = D.parts[k]; if (+k === m[0] || q.family !== cur.family || q.kind !== cur.kind || !(q.hcls & mask)) return; cs.push([(key(q) === ck ? 0 : 1000) + Math.abs((q.weight || 0) - (cur.weight || 0)), +k]); });
+      cs.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+      var o0 = m[0], q0 = p && p[0];
+      for (var k = 0; k < cs.length && k < 12; k++) {
+        m[0] = cs[k][1]; if (p) p[0] = cs[k][1];
+        if (!check(m, [i, j]) && (!p || !check(p, [i, j])) || fitPart(i, j)) { m[9] = 0; if (p) p[9] = 0; return true; }
+      }
+      m[0] = o0; if (p) p[0] = q0; return false;
     }
     function fitPart(i, j) {      // the smallest move that makes a part legal on the new hull (j = its mirrored partner, or -1): its level up or down (a lower deck, a taller hull side), across the ship toward the centre line first (the deck got narrower), along the ship; false if nothing within reach fits
       var m = state.mounts[i], p = j >= 0 ? state.mounts[j] : null, g = geo(m); if (!g) return false;
@@ -1372,13 +1385,16 @@ canvas{width:100%;height:auto;display:block;margin:0 auto;image-rendering:pixela
       state.tool = sv.tool; state.sel = sv.sel; state.held = sv.held; state.heldPartner = sv.hp; state.hideCur = sv.hide; state.shotWhite = false; draw();
       var Hh = D.hulls[state.hull], S = stats(), X = extra(), V = vp(), mono = '"Courier New", Courier, "Liberation Mono", monospace', sans = '"Segoe UI", system-ui, Arial, sans-serif', WHITE = '#ffffff';
       g.textBaseline = 'alphabetic'; g.fillStyle = WHITE; g.font = 'bold 28px ' + mono; g.textAlign = 'left'; g.fillText(state.name || Hh.name, SP + 28, TP + 22);
+      if (state.name) { g.font = '18px ' + mono; g.fillStyle = '#c9d6ea'; g.fillText(Hh.name, SP + 28, TP + 46); g.fillStyle = WHITE; }      // a custom ship name: the hull is listed underneath
       var rows = [['WEIGHT LIMIT', S.weight + ' / ' + Hh.mwg + 't', S.weight > Hh.mwg], ['PARTS MAX', state.mounts.length + '/100', state.mounts.length > 100], ['ENDURANCE', X.endurance], ['COMMAND', X.command], ['RADAR / SONAR', X.radar + ' / ' + X.sonar], ['STEERING', X.steering], ['SPEED', S.speed ? S.speed.toFixed(1) + 'kt' : '-']];
       var ne = state.mounts.filter(function (m) { return m[9]; }).length; if (ne) rows.splice(2, 0, ['PARTS IN ERROR', ne, true]); if (X.unvented) rows.splice(rows.length - 1, 0, ['UNVENTED BOILERS', X.unvented, true]);
       g.font = 'bold 22px ' + mono; rows.forEach(function (r, i) { var yy = TP + 22 + i * 28; g.textAlign = 'left'; g.fillStyle = WHITE; g.fillText(r[0], SP + BW - 420, yy); g.textAlign = 'right'; g.fillStyle = r[2] ? '#ff6b6b' : WHITE; g.fillText(String(r[1]), SP + BW - 28, yy); });      // all white (red only for a warning)
       if (V.pct) { g.textAlign = 'center'; g.fillStyle = WHITE; g.font = 'bold 30px ' + mono; g.fillText('VP:' + V.pct + '%', SP + 4 * (V.x0 + V.x1), TP + 2 * 380 + 10); }
       g.fillStyle = '#2b4a7e'; g.fillRect(0, HB, W, 3);      // the bottom band keeps the blueprint paper and grid (drawn at the start); a rule separates it
-      g.textAlign = 'left'; g.font = 'bold 19px ' + mono; g.fillStyle = WHITE; g.fillText('ARMOR RATING', SP + 28, HB + 38); g.fillStyle = WHITE;
-      g.fillText(state.armorIdx ? S.armor.cm + 'cm  ' + (S.armor.core ? 'Core' : 'Full') + '  (' + S.armor.w + 't)' : 'None', SP + 210, HB + 38);
+      g.textAlign = 'left'; g.font = 'bold 19px ' + mono; g.fillStyle = WHITE; g.fillText('ARMOR', SP + 28, HB + 38); g.fillStyle = WHITE;
+      g.fillText(state.armorIdx ? S.armor.cm + 'cm  ' + (S.armor.core ? 'Core' : 'Full') + '  (' + S.armor.w + 't)' : 'None', SP + 120, HB + 38);
+      var eng = []; [10, 11].forEach(function (cat) { var cnt = {}, ord = []; state.mounts.forEach(function (m) { if ((m[4] & 255) !== cat || !D.parts[m[0]]) return; if (!cnt[m[0]]) { cnt[m[0]] = 0; ord.push(m[0]); } cnt[m[0]]++; }); ord.forEach(function (id) { eng.push(labelOf(id) + ' x' + cnt[id]); }); });      // boilers / reactors, then turbines: type and count (no purge)
+      if (eng.length) { g.textAlign = 'left'; g.font = 'bold 19px ' + mono; g.fillText(eng.join('   '), SP + 440, HB + 38); }
       function col(x0, title, sub, lines) { g.font = 'bold 18px ' + mono; g.fillStyle = WHITE; g.textAlign = 'left'; g.fillText(title, x0, HB + 86); if (sub) { g.textAlign = 'right'; g.fillStyle = WHITE; g.fillText(sub, x0 + 380, HB + 86); }
         lines.forEach(function (l, i) { var yy = HB + 118 + i * 25, nx = x0; g.textAlign = 'left';
           if (l[2]) { g.font = 'bold 18px ' + mono; g.fillStyle = WHITE; g.fillText(l[2], x0, yy); nx = x0 + 38; }      // the aircraft chip (VQ, VA ...) as typewriter text, not framed
