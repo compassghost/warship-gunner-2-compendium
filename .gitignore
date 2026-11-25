@@ -1,5 +1,6 @@
 iso_extract/
-data/
+data/*
+!data/weapon_models.json
 music/
 *.iso
 *.bin

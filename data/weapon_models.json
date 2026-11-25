@@ -1,0 +1,750 @@
+{
+ "_note": "User-identified weapon models (2026-11-12). model = dock file name without H; group = tech-tree group; match = regex tested against the chip's full name (cal-length chips like 45Cal..75Cal share one model, so the pattern covers all of them); a link with no group/match only labels the model (a mount variant that no chip owns). Applied by tools/model_entities.py into web/models/chips.json and web/models/weapon_labels.json.",
+ "links": [
+  {
+   "model": "w_ho_153",
+   "group": "MAIN",
+   "match": "^100\\.0cm Gun( \\d+Cal)?$",
+   "label": "100.0cm Gun (all cal-lengths)"
+  },
+  {
+   "model": "w_ho_197",
+   "group": "PROTO",
+   "match": "^\\d+mm AGS$",
+   "label": "AGS (all calibers), 1 barrel"
+  },
+  {
+   "model": "w_ho_198",
+   "group": "PROTO",
+   "match": "^\\d+mm AGS 2brls$",
+   "label": "AGS (all calibers), 2 barrels"
+  },
+  {
+   "model": "w_ho_199",
+   "group": "PROTO",
+   "match": "^\\d+mm AGS 3brls$",
+   "label": "AGS (all calibers), 3 barrels"
+  },
+  {
+   "model": "w_ki_000",
+   "group": "MACHINE",
+   "match": "Machine Gun",
+   "label": "Machine gun (any barrel count)"
+  },
+  {
+   "model": "w_ki_004",
+   "label": "Machine gun, elevated mount variant"
+  },
+  {
+   "model": "w_ki_008",
+   "label": "Machine gun, carrier mount variant"
+  },
+  {
+   "model": "w_ki_009",
+   "group": "MACHINE",
+   "match": "CIWS",
+   "label": "CIWS"
+  },
+  {
+   "model": "w_ki_012",
+   "label": "CIWS, carrier mount variant"
+  },
+  {
+   "model": "w_ki_013",
+   "group": "RAPID",
+   "match": "^88mm 2b Revolving Gun$",
+   "label": "Twin gatling gun (88mm 2b Revolving Gun)"
+  },
+  {
+   "model": "w_gy_043",
+   "label": "Submarine turret torpedo launcher",
+   "auto2": true,
+   "group": "TORPEDO",
+   "match": "UWW Tur"
+  },
+  {
+   "model": "w_ms_000",
+   "label": "VLS launcher",
+   "auto2": true,
+   "group": "MISSILE",
+   "match": "^(?!High Explosive).*VLS"
+  },
+  {
+   "model": "w_ms_001",
+   "label": "High-explosive VLS launcher",
+   "auto2": true,
+   "group": "MISSILE",
+   "match": "^High Explosive Msl VLS$"
+  },
+  {
+   "model": "w_ms_008",
+   "label": "RAM launcher",
+   "auto2": true,
+   "group": "MISSILE",
+   "match": "^RAM$"
+  },
+  {
+   "model": "w_ro_001",
+   "group": "ROCKET",
+   "match": "^(?:\\d+cm Rocket Launcher|Napalm Grenade Gun|Cluster Rocket Launcher)$",
+   "label": "Rocket launcher (30-80cm Rocket Launchers, Napalm Grenade Gun, Cluster Rocket Launcher; user-identified 2026-11-13)"
+  },
+  {
+   "model": "w_tk_002",
+   "group": "ORGANIC",
+   "match": "^Ring Laser$",
+   "label": "Ring Laser (user-identified 2026-11-13)"
+  },
+  {"model": "w_en_008", "group": "OPTICAL", "match": "^Pulse Laser", "label": "Pulse Laser I-III (base only? the round top may be a separate part; user-identified 2026-11-13)"},
+  {"model": "w_en_002", "group": "OPTICAL", "match": "^X-ray Ordnance$", "label": "X-ray Ordnance (user-identified 2026-11-13)"},
+  {"model": "w_en_003", "group": "OPTICAL", "match": "^High X-ray Ordnance$", "label": "High X-ray Ordnance (user-identified 2026-11-13)"},
+  {"model": "w_en_000", "group": "OPTICAL", "match": "^(?:New )?Krypton Laser$|^Cith Laser|^Dorn Laser", "label": "Krypton / New Krypton, Cith, Dorn lasers (user-identified 2026-11-13)"},
+  {"model": "w_en_001", "group": "OPTICAL", "match": "^(?:New )?Electron Laser$|^Crois Laser|^Sian Laser", "label": "Electron / New Electron, Crois, Sian lasers (user-identified 2026-11-13)"},
+  {"model": "w_en_006", "group": "OPTICAL", "match": "^Sil Laser", "label": "Sil Laser, Particle guns, Magnetic Pulse Gun (user-identified 2026-11-13)"},
+  {"model": "w_en_006", "group": "PLASMA", "match": "^(?:Particle|Particle Burst|Guided Particle) Gun", "label": "Sil Laser, Particle guns, Magnetic Pulse Gun (user-identified 2026-11-13)"},
+  {"model": "w_en_006", "group": "PULSE", "match": "^Magnetic Pulse Gun$", "label": "Sil Laser, Particle guns, Magnetic Pulse Gun (user-identified 2026-11-13)"},
+  {"model": "w_tk_002", "group": "PLASMA", "match": "^(?:New )?Plasma Gun$|^(?:New )?Guided Plasma Gun$", "label": "Ring Laser, Plasma Gun, Guided Plasma Gun (user-identified 2026-11-13)"},
+  {"model": "w_tk_003", "group": "PLASMA", "match": "^(?:New )?Burst Plasma Gun$", "label": "Burst Plasma Gun, New Burst Plasma Gun (user-identified 2026-11-13)"},
+  {"model": "w_tk_004", "group": "MAGNETIC", "match": "^Tower Railgun$", "label": "Tower Railgun (user-identified 2026-11-13)"},
+  {"model": "w_tk_000", "group": "PULSE", "match": "^(?:Magnetic Pulse Cannon|Breac Wave Gun|Siorc Wave Gun|Massive Wave Gun|Sepia Pulse Cannon)$", "label": "Pulse cannons / wave guns (user-identified 2026-11-13)"},
+  {"model": "w_ro_003", "group": "A-MATTER", "match": "^Photon Gun$", "label": "Depth Charge Launcher, Photon Gun (user-identified 2026-11-13)"},
+  {
+   "model": "w_ro_000",
+   "group": "ROCKET",
+   "match": "MLRS$",
+   "label": "MLRS (12cm 30b, 20cm 12b; user-identified 2026-11-13)"
+  },
+  {
+   "model": "w_ro_007",
+   "group": "FLARE",
+   "match": "^(?:Illumination Flare|Signal Flare|Chaff Grenade)$",
+   "label": "Flare launcher (Illumination, Signal, Chaff; user-identified 2026-11-13)"
+  },
+  {
+   "model": "w_ho_000",
+   "group": "FLARE",
+   "match": "^Salute Gun$",
+   "label": "10.0cm/12.7cm gun, 1 barrel (also the Salute Gun; user-identified 2026-11-13)"
+  },
+  {
+   "model": "w_en_011",
+   "label": "Pulse weapon (chip unknown)",
+   "auto2": true
+  },
+  {
+   "model": "w_en_004",
+   "label": "Crab laser",
+   "auto2": true,
+   "group": "ORGANIC",
+   "match": "Crab Laser"
+  },
+  {
+   "model": "w_en_005",
+   "label": "Cat laser",
+   "auto2": true,
+   "group": "ORGANIC",
+   "match": "Cat Beam"
+  },
+  {
+   "model": "w_tk_005",
+   "label": "Railgun",
+   "auto2": true,
+   "group": "MAGNETIC",
+   "match": "^Railgun"
+  },
+  {
+   "model": "w_tk_007",
+   "label": "Mysterious Gun",
+   "auto2": true,
+   "group": "ROCKET",
+   "match": "^Mysterious Gun$"
+  },
+  {
+   "model": "w_tk_006",
+   "label": "Flamethrower",
+   "auto2": true,
+   "group": "ROCKET",
+   "match": "Flamethrower"
+  },
+  {
+   "model": "w_tk_000",
+   "label": "Wave gun (which one unknown)",
+   "auto2": true
+  },
+  {
+   "model": "w_tk_002",
+   "label": "Wave gun (which one unknown)",
+   "auto2": true
+  },
+  {
+   "model": "w_tk_003",
+   "label": "Wave gun (which one unknown)",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_005",
+   "label": "Torpedo launcher, 2 barrels (base chip) (set 005-009: by caliber, any torpedo type)",
+   "group": "TORPEDO",
+   "match": "^(?:45\\.0|53\\.3|61\\.0|32\\.4)cm (?:UWW )?(?:Torpedo|Oxy Trp|Gdd Trp)$",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_006",
+   "label": "Torpedo launcher, 3 barrels (set 005-009: by caliber, any torpedo type)",
+   "group": "TORPEDO",
+   "match": "^(?:45\\.0|53\\.3|61\\.0|32\\.4)cm (?:UWW )?(?:Torpedo|Oxy Trp|Gdd Trp) 3brls$",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_007",
+   "label": "Torpedo launcher, 4 barrels (set 005-009: by caliber, any torpedo type)",
+   "group": "TORPEDO",
+   "match": "^(?:45\\.0|53\\.3|61\\.0|32\\.4)cm (?:UWW )?(?:Torpedo|Oxy Trp|Gdd Trp) 4brls$",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_008",
+   "label": "Torpedo launcher, 5 barrels (set 005-009: by caliber, any torpedo type)",
+   "group": "TORPEDO",
+   "match": "^(?:45\\.0|53\\.3|61\\.0|32\\.4)cm (?:UWW )?(?:Torpedo|Oxy Trp|Gdd Trp) 5brls$",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_009",
+   "label": "Torpedo launcher, 7 barrels (set 005-009: by caliber, any torpedo type)",
+   "group": "TORPEDO",
+   "match": "^(?:45\\.0|53\\.3|61\\.0|32\\.4)cm (?:UWW )?(?:Torpedo|Oxy Trp|Gdd Trp) 7brls$",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_012",
+   "label": "Torpedo launcher, 2 barrels (base chip) (set 012-021: by caliber, any torpedo type)",
+   "group": "TORPEDO",
+   "match": "^(?:48\\.3|68\\.0)cm (?:UWW )?(?:Torpedo|Oxy Trp|Gdd Trp)$",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_014",
+   "label": "Torpedo launcher, 3 barrels (set 012-021: by caliber, any torpedo type)",
+   "group": "TORPEDO",
+   "match": "^(?:48\\.3|68\\.0)cm (?:UWW )?(?:Torpedo|Oxy Trp|Gdd Trp) 3brls$",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_016",
+   "label": "Torpedo launcher, 4 barrels (set 012-021: by caliber, any torpedo type)",
+   "group": "TORPEDO",
+   "match": "^(?:48\\.3|68\\.0)cm (?:UWW )?(?:Torpedo|Oxy Trp|Gdd Trp) 4brls$",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_019",
+   "label": "Torpedo launcher, 5 barrels (set 012-021: by caliber, any torpedo type)",
+   "group": "TORPEDO",
+   "match": "^(?:48\\.3|68\\.0)cm (?:UWW )?(?:Torpedo|Oxy Trp|Gdd Trp) 5brls$",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_021",
+   "label": "Torpedo launcher, 7 barrels (set 012-021: by caliber, any torpedo type)",
+   "group": "TORPEDO",
+   "match": "^(?:48\\.3|68\\.0)cm (?:UWW )?(?:Torpedo|Oxy Trp|Gdd Trp) 7brls$",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_033",
+   "label": "Torpedo launcher, 2 barrels (base chip) (set 033-035: by caliber, any torpedo type)",
+   "group": "TORPEDO",
+   "match": "^80\\.0cm (?:UWW )?(?:Torpedo|Oxy Trp|Gdd Trp)$",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_034",
+   "label": "Torpedo launcher, 3 barrels (set 033-035: by caliber, any torpedo type)",
+   "group": "TORPEDO",
+   "match": "^80\\.0cm (?:UWW )?(?:Torpedo|Oxy Trp|Gdd Trp) 3brls$",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_035",
+   "label": "Torpedo launcher, 4 barrels (set 033-035: by caliber, any torpedo type)",
+   "group": "TORPEDO",
+   "match": "^80\\.0cm (?:UWW )?(?:Torpedo|Oxy Trp|Gdd Trp) 4brls$",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_037",
+   "label": "Torpedo launcher, 2 barrels (base chip) (set 037-040: supersonic oxy, sonar guided and ASW guided)",
+   "group": "TORPEDO",
+   "match": "^(?:Sonar-Gdd Trp|UWW Sonar-Gdd Trp|ASW Gdd Trp|New ASW Gdd Trp|Supersonic Oxy Trp|New Supersonic Oxy Trp|Ssonic UWW Oxy Trp|New Ssonic UWW Oxy Trp)$",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_038",
+   "label": "Torpedo launcher, 3 barrels (set 037-040: supersonic oxy, sonar guided and ASW guided)",
+   "group": "TORPEDO",
+   "match": "^(?:Sonar-Gdd Trp|UWW Sonar-Gdd Trp|ASW Gdd Trp|New ASW Gdd Trp|Supersonic Oxy Trp|New Supersonic Oxy Trp|Ssonic UWW Oxy Trp|New Ssonic UWW Oxy Trp) 3brls$",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_039",
+   "label": "Torpedo launcher, 4 barrels (set 037-040: supersonic oxy, sonar guided and ASW guided)",
+   "group": "TORPEDO",
+   "match": "^(?:Sonar-Gdd Trp|UWW Sonar-Gdd Trp|ASW Gdd Trp|New ASW Gdd Trp|Supersonic Oxy Trp|New Supersonic Oxy Trp|Ssonic UWW Oxy Trp|New Ssonic UWW Oxy Trp) 4brls$",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_040",
+   "label": "Torpedo launcher, 5 barrels (set 037-040: supersonic oxy, sonar guided and ASW guided)",
+   "group": "TORPEDO",
+   "match": "^(?:Sonar-Gdd Trp|UWW Sonar-Gdd Trp|ASW Gdd Trp|New ASW Gdd Trp|Supersonic Oxy Trp|New Supersonic Oxy Trp|Ssonic UWW Oxy Trp|New Ssonic UWW Oxy Trp) 5brls$",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_036",
+   "label": "Torpedo launcher for High Explosive Gdd Trp and Long Range ASW Gdd Trp",
+   "group": "TORPEDO",
+   "match": "^(?:High Explosive Gdd Trp|Long Range ASW Gdd Trp)$",
+   "auto2": true
+  },
+  {
+   "model": "w_gy_037",
+   "label": "Torpedo launcher for MMLay / CMLay torpedoes (037 only)",
+   "group": "TORPEDO",
+   "match": "^(?:CMLay|MMLay)(?: UWW)? Torpedo$",
+   "auto2": true
+  },
+  {
+   "model": "w_ga_000",
+   "group": "RAPID",
+   "match": "^127mm Gatling Cannon$",
+   "label": "127mm Gatling Cannon"
+  },
+  {
+   "model": "w_ga_002",
+   "group": "RAPID",
+   "match": "^(?:203|254|305|356|381|406)mm Gatling Cannon$",
+   "label": "Large-caliber Gatling Cannon (203mm to 406mm)"
+  },
+  {
+   "model": "w_ki_015",
+   "group": "RAPID",
+   "match": "^40mm Revolving Gun$",
+   "label": "40mm Revolving Gun"
+  },
+  {
+   "model": "w_ki_018",
+   "group": "RAPID",
+   "match": "^57mm Revolving Gun$",
+   "label": "57mm Revolving Gun"
+  },
+  {
+   "model": "w_ho_000",
+   "group": "MAIN",
+   "match": "^10\\.0cm Gun( \\d+Cal)?$",
+   "label": "10.0cm gun, 1 barrel",
+   "auto": true
+  },
+  {
+   "model": "w_ho_007",
+   "group": "MAIN",
+   "match": "^10\\.0cm Gun 2brls$",
+   "label": "10.0cm gun, 2 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_014",
+   "group": "MAIN",
+   "match": "^10\\.0cm Gun 3brls$",
+   "label": "10.0cm gun, 3 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ko_000",
+   "group": "HI ANGLE",
+   "match": "^[\\d.]+cm High Angle Gun( \\d+Cal)?$",
+   "label": "High-angle gun (10.0cm and 12.7cm; user-identified 2026-11-13)"
+  },
+  {
+   "model": "w_ko_001",
+   "label": "High-angle gun (Side) (user-identified 2026-11-13)"
+  },
+  {
+   "model": "w_ki_012",
+   "label": "CIWS (Side) (user-identified 2026-11-14)"
+  },
+  {
+   "model": "w_ms_006",
+   "label": "Missile Launcher (Side) (user-identified 2026-11-14)"
+  },
+  {
+   "model": "w_ro_004",
+   "label": "Rocket Launcher (Side) (user-identified 2026-11-14)"
+  },
+  {
+   "model": "w_ho_001",
+   "group": "MAIN",
+   "match": "^12\\.7cm Gun( \\d+Cal)?$",
+   "label": "12.7cm gun, 1 barrel (user-identified 2026-11-13: the 12.7 counterpart of w_ho_000)"
+  },
+  {
+   "model": "w_ho_008",
+   "label": "12.7cm gun, 2 barrels (no chip uses it; counterpart of w_ho_007)",
+   "auto": true
+  },
+  {
+   "model": "w_ho_015",
+   "label": "12.7cm gun, 3 barrels (no chip uses it; counterpart of w_ho_014)",
+   "auto": true
+  },
+  {
+   "model": "w_ho_046",
+   "group": "MAIN",
+   "match": "^(?:14\\.0)cm Gun( \\d+Cal)?$",
+   "label": "14.0cm gun, 1 barrel",
+   "auto": true
+  },
+  {
+   "model": "w_ho_049",
+   "group": "MAIN",
+   "match": "^(?:14\\.0)cm Gun 2brls$",
+   "label": "14.0cm gun, 2 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_052",
+   "group": "MAIN",
+   "match": "^(?:14\\.0)cm Gun 3brls$",
+   "label": "14.0cm gun, 3 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_055",
+   "group": "MAIN",
+   "match": "^(?:14\\.0)cm Gun 4brls$",
+   "label": "14.0cm gun, 4 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_058",
+   "group": "MAIN",
+   "match": "^(?:15\\.2|15\\.5|20\\.3)cm Gun( \\d+Cal)?$",
+   "label": "15.2cm/15.5cm/20.3cm gun, 1 barrel",
+   "auto": true
+  },
+  {
+   "model": "w_ho_062",
+   "group": "MAIN",
+   "match": "^(?:15\\.2|15\\.5|20\\.3)cm Gun 2brls$",
+   "label": "15.2cm/15.5cm/20.3cm gun, 2 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_066",
+   "group": "MAIN",
+   "match": "^(?:15\\.2|15\\.5|20\\.3)cm Gun 3brls$",
+   "label": "15.2cm/15.5cm/20.3cm gun, 3 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_070",
+   "group": "MAIN",
+   "match": "^(?:15\\.2|15\\.5|20\\.3)cm Gun 4brls$",
+   "label": "15.2cm/15.5cm/20.3cm gun, 4 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_074",
+   "group": "MAIN",
+   "match": "^(?:25\\.4)cm Gun( \\d+Cal)?$",
+   "label": "25.4cm gun, 1 barrel",
+   "auto": true
+  },
+  {
+   "model": "w_ho_078",
+   "group": "MAIN",
+   "match": "^(?:25\\.4)cm Gun 2brls$",
+   "label": "25.4cm gun, 2 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_082",
+   "group": "MAIN",
+   "match": "^(?:25\\.4)cm Gun 3brls$",
+   "label": "25.4cm gun, 3 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_086",
+   "group": "MAIN",
+   "match": "^(?:25\\.4)cm Gun 4brls$",
+   "label": "25.4cm gun, 4 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_090",
+   "group": "MAIN",
+   "match": "^(?:28\\.0)cm Gun( \\d+Cal)?$",
+   "label": "28.0cm gun, 1 barrel",
+   "auto": true
+  },
+  {
+   "model": "w_ho_094",
+   "group": "MAIN",
+   "match": "^(?:28\\.0)cm Gun 2brls$",
+   "label": "28.0cm gun, 2 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_098",
+   "group": "MAIN",
+   "match": "^(?:28\\.0)cm Gun 3brls$",
+   "label": "28.0cm gun, 3 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_102",
+   "group": "MAIN",
+   "match": "^(?:28\\.0)cm Gun 4brls$",
+   "label": "28.0cm gun, 4 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_106",
+   "group": "MAIN",
+   "match": "^(?:30\\.5|35\\.6)cm Gun( \\d+Cal)?$",
+   "label": "30.5cm/35.6cm gun, 1 barrel",
+   "auto": true
+  },
+  {
+   "model": "w_ho_109",
+   "group": "MAIN",
+   "match": "^(?:30\\.5|35\\.6)cm Gun 2brls$",
+   "label": "30.5cm/35.6cm gun, 2 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_112",
+   "group": "MAIN",
+   "match": "^(?:30\\.5|35\\.6)cm Gun 3brls$",
+   "label": "30.5cm/35.6cm gun, 3 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_115",
+   "group": "MAIN",
+   "match": "^(?:30\\.5|35\\.6)cm Gun 4brls$",
+   "label": "30.5cm/35.6cm gun, 4 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_118",
+   "group": "MAIN",
+   "match": "^(?:38\\.1|40\\.6|41\\.0|43\\.2)cm Gun( \\d+Cal)?$",
+   "label": "38.1cm/40.6cm/41.0cm/43.2cm gun, 1 barrel",
+   "auto": true
+  },
+  {
+   "model": "w_ho_121",
+   "group": "MAIN",
+   "match": "^(?:38\\.1|40\\.6|41\\.0|43\\.2)cm Gun 2brls$",
+   "label": "38.1cm/40.6cm/41.0cm/43.2cm gun, 2 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_124",
+   "group": "MAIN",
+   "match": "^(?:38\\.1|40\\.6|41\\.0|43\\.2)cm Gun 3brls$",
+   "label": "38.1cm/40.6cm/41.0cm/43.2cm gun, 3 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_127",
+   "group": "MAIN",
+   "match": "^(?:38\\.1|40\\.6|41\\.0|43\\.2)cm Gun 4brls$",
+   "label": "38.1cm/40.6cm/41.0cm/43.2cm gun, 4 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_130",
+   "group": "MAIN",
+   "match": "^(?:45\\.7|46\\.0|50\\.8)cm Gun( \\d+Cal)?$",
+   "label": "45.7cm/46.0cm/50.8cm gun, 1 barrel",
+   "auto": true
+  },
+  {
+   "model": "w_ho_133",
+   "group": "MAIN",
+   "match": "^(?:45\\.7|46\\.0|50\\.8)cm Gun 2brls$",
+   "label": "45.7cm/46.0cm/50.8cm gun, 2 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_136",
+   "group": "MAIN",
+   "match": "^(?:45\\.7|46\\.0|50\\.8)cm Gun 3brls$",
+   "label": "45.7cm/46.0cm/50.8cm gun, 3 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_139",
+   "group": "MAIN",
+   "match": "^(?:45\\.7|46\\.0|50\\.8)cm Gun 4brls$",
+   "label": "45.7cm/46.0cm/50.8cm gun, 4 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_142",
+   "group": "MAIN",
+   "match": "^(?:56\\.0|61\\.0)cm Gun( \\d+Cal)?$",
+   "label": "56.0cm/61.0cm gun, 1 barrel",
+   "auto": true
+  },
+  {
+   "model": "w_ho_145",
+   "group": "MAIN",
+   "match": "^(?:56\\.0|61\\.0)cm Gun 2brls$",
+   "label": "56.0cm/61.0cm gun, 2 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_148",
+   "group": "MAIN",
+   "match": "^(?:56\\.0|61\\.0)cm Gun 3brls$",
+   "label": "56.0cm/61.0cm gun, 3 barrels",
+   "auto": true
+  },
+  {
+   "model": "w_ho_151",
+   "group": "MAIN",
+   "match": "^(?:80\\.0)cm Gun( \\d+Cal)?$",
+   "label": "80.0cm gun (twin barrel; the only 80cm option)",
+   "auto": true
+  },
+  {
+   "model": "w_to_000",
+   "group": "EXPLOSIVE",
+   "match": "^Depth Charge$",
+   "label": "Depth Charge"
+  },
+  {
+   "model": "w_ro_005",
+   "group": "EXPLOSIVE",
+   "match": "^Anti-Sub Rocket$",
+   "label": "Anti-Sub Rocket"
+  },
+  {
+   "model": "w_ro_006",
+   "group": "EXPLOSIVE",
+   "match": "^New Anti-Sub Rocket$",
+   "label": "New Anti-Sub Rocket"
+  },
+  {
+   "model": "w_ro_003",
+   "group": "EXPLOSIVE",
+   "match": "^Depth Charge Launcher$",
+   "label": "Depth Charge Launcher"
+  },
+  {
+   "model": "w_to_001",
+   "group": "EXPLOSIVE",
+   "match": "Mines?$|^Decoy Launcher",
+   "label": "Mines (all of them, and the Decoy Launchers)"
+  },
+  {
+   "model": "w_ms_005",
+   "group": "MISSILE",
+   "match": "^(?:Anti-Ship Missile [ⅠⅡⅢ]|Cruise Missile)$",
+   "label": "Anti-Ship Missile (SSM), also Cruise Missile"
+  },
+  {
+   "model": "w_ms_003",
+   "group": "MISSILE",
+   "match": "^Multi-Purpose Msl [ⅠⅡⅢ]$",
+   "label": "Multi-Purpose Missile (MPM)"
+  },
+  {
+   "model": "w_ms_002",
+   "group": "MISSILE",
+   "match": "^Anti-Air Missile [ⅠⅡⅢ]$",
+   "label": "Anti-Air Missile (SAM)"
+  },
+  {
+   "model": "w_ms_004",
+   "group": "MISSILE",
+   "match": "^(?:Cluster SSM Launcher [ⅠⅡⅢ]|Drill Missile|Long Range SSM)$",
+   "label": "Cluster SSM launcher (CLM), Drill Missile, Long Range SSM"
+  },
+  {
+   "model": "w_ms_007",
+   "group": "MISSILE",
+   "match": "^Anti-Sub Missile [ⅠⅡⅢ]$",
+   "label": "Anti-Sub Missile (ASM)"
+  },
+  {
+   "model": "w_ms_000",
+   "group": "MISSILE",
+   "match": "^(?:ASROC [ⅠⅡⅢ]|Napalm Missile)$",
+   "label": "VLS launcher, also ASROC and Napalm Missile"
+  },
+  {
+   "model": "w_ms_001",
+   "group": "MISSILE",
+   "match": "^EMP Missile$",
+   "label": "High-explosive VLS launcher, also EMP Missile"
+  },
+  {
+   "model": "w_en_002",
+   "group": "MISSILE",
+   "match": "^Laser Pointer$",
+   "label": "Laser Pointer (Ptr)"
+  },
+  {
+   "model": "w_ho_196",
+   "group": "PROTO",
+   "match": "High-V Gun$",
+   "label": "High-V guns (every PROTO gun that is not an AGS)"
+  },
+  {
+   "model": "j_cv_elv_00",
+   "group": "FACILITY",
+   "match": "^Elevator$",
+   "label": "Elevator (user-identified 2026-11-13)"
+  },
+  {
+   "model": "a_cv_hlp_00",
+   "group": "FACILITY",
+   "match": "^Heliport$",
+   "label": "Heliport, small (HP S; user-identified 2026-11-13)"
+  },
+  {
+   "model": "a_cv_hlp_01",
+   "group": "FACILITY",
+   "match": "^Large Heliport$",
+   "label": "Heliport, large (HP L; user-identified 2026-11-13)"
+  },
+  {
+   "model": "a_ca_cat_00",
+   "group": "FACILITY",
+   "match": "^Launcher$",
+   "label": "Launcher S (Lchr S; user-identified 2026-11-14)"
+  },
+  {
+   "model": "a_bb_cat_00",
+   "group": "FACILITY",
+   "match": "^Heavy Launcher$",
+   "label": "Launcher L (Lchr L; user-identified 2026-11-14)"
+  },
+  {
+   "model": "j_bb_tan_00",
+   "extra": "Searchlight",
+   "label": "Searchlight (user-identified 2026-11-14; chip is not on any tree, so build_classified.py links it by the \"extra\" name)"
+  }
+ ],
+ "no_model": [
+  {"group": "AMMO", "match": ".", "why": "user: no ammo chip has a model"},
+  {"group": "TORPEDO", "match": "^Anti-Mine Torpedo$", "why": "user: likely an internal sub component, no model"},
+  {"group": "FACILITY", "match": "^Catapult$", "why": "user: the catapult has no model of its own"},
+  {"group": "FACILITY", "match": "^Ammunition Depot$", "why": "user: the ammunition depot has no model"}
+ ]
+}
